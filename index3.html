@@ -271,7 +271,7 @@
   const totalSteps = days * pointsPerDay;
   let forecast = null;
 
-  fetch("forecast_baltic.json")
+  fetch("http://localhost:8000/api/forecast")
     .then(resp => resp.json())
     .then(data => {
       forecast = data;
