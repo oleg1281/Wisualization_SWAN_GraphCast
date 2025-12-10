@@ -1,0 +1,4 @@
+запуск сервера index.html    войти в папку c:\Users\obedenok\PycharmProjects\Wisualization_SWAN_GraphCast\
+и запустить python -m http.server 8080
+
+запуск сервера fast api      uvicorn main:app --host 0.0.0.0 --port 8000 --reload
