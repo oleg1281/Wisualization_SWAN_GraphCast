@@ -9,194 +9,264 @@
   <script src="https://unpkg.com/leaflet-velocity/dist/leaflet-velocity.min.js"></script>
 
   <style>
-  html, body, #map {
-    height: 100%;
-    margin: 0;
-    background: #000;
-    overflow: hidden;
-    font-family: "Segoe UI", Arial, sans-serif;
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    /* === 🌊 Морская панель прогноза === */
+    #forecast-panel {
+      position: absolute;
+      bottom: 0;                /* всегда у нижнего края */
+      left: 0;
+      width: 100%;
+
+      background: linear-gradient(180deg, rgba(0,40,60,0) 0%, rgba(0,25,40,1) 100%);
+      backdrop-filter: blur(14px) saturate(130%);
+      -webkit-backdrop-filter: blur(14px) saturate(130%);
+
+      border-top: 1px solid rgba(0, 255, 255, 0.25);
+      box-shadow: 0 -6px 25px rgba(0, 255, 255, 0.18);
+
+      color: #dffaff;
+      overflow-x: auto;
+      white-space: nowrap;
+      padding: 10px 14px;
+      z-index: 9999;
+      text-align: center;
+
+      /* 🔥 плавный выезд/заезд */
+      transform: translateY(0%);
+      transition: transform 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
+
+      /* фиксированная максимальная высота (важно для плавности!) */
+      max-height: 260px;
+    }
+
+    /* === Когда закрыто — увезти вниз на 60% === */
+  #forecast-panel.closed {
+    transform: translateY(50%);
   }
 
-  /* === 🌊 Морская панель прогноза === */
-  #forecast-panel {
-    position: absolute;
-    bottom: 0;                /* всегда у нижнего края */
-    left: 0;
-    width: 100%;
+    /* --- Ручка панели --- */
+    #panel-handle {
+      width: 65px;
+      height: 6px;
+      background: rgba(255,255,255,0.35);
+      border-radius: 3px;
+      margin: 8px auto 10px auto;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    #panel-handle:hover {
+      background: rgba(255,255,255,0.75);
+    }
 
-    background: linear-gradient(180deg, rgba(0,40,60,0) 0%, rgba(0,25,40,1) 100%);
-    backdrop-filter: blur(14px) saturate(130%);
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    /* Заголовок */
+    #forecast-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #b8f4ff;
+      text-shadow: 0 0 6px #00bcd4;
+      margin-bottom: 6px;
+      letter-spacing: 0.4px;
+    }
 
-    border-top: 1px solid rgba(0, 255, 255, 0.25);
-    box-shadow: 0 -6px 25px rgba(0, 255, 255, 0.18);
+    /* Таблица */
+    #forecast-panel table {
+      border-collapse: collapse;
+      width: 2200px;
+      margin: 0 auto;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #dffaff;
+    }
 
-    color: #dffaff;
-    overflow-x: auto;
-    white-space: nowrap;
-    padding: 10px 14px;
-    z-index: 9999;
-    text-align: center;
+    #forecast-panel td {
+      border: 1px solid rgba(255,255,255,0.07);
+      padding: 3px 5px;
+      background: rgba(0,60,80,0.25);
+      transition: background 0.3s;
+    }
+    #forecast-panel td:hover {
+      background: rgba(0,200,255,0.25);
+    }
 
-    /* 🔥 плавный выезд/заезд */
-    transform: translateY(0%);
-    transition: transform 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
+    .active-time {
+      background: rgba(0,188,212,0.6) !important;
+      color: #fff !important;
+    }
 
-    /* фиксированная максимальная высота (важно для плавности!) */
-    max-height: 260px;
-  }
+    .waves { color: #4de8ff; }
+    .wind { color: #ffd633; }
+    .temp { color: #ff9b7d; }
+    .rain { color: #00baff; }
+    .clouds { color: #b9ecff; }
+    .pressure { color: #ffaa33; }
 
-  /* === Когда закрыто — увезти вниз на 60% === */
-#forecast-panel.closed {
-  transform: translateY(50%);
-}
+    /* === Узкая панель управления временем === */
+    #time-controls {
+      position: absolute;
+      bottom: 235px;
+      left: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 420px;
+      height: 28px;
+      background: rgba(0,40,60,0.3);
+      border: 1px solid #00bcd466;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #00bcd455;
+      padding: 4px 10px;
+      backdrop-filter: blur(8px);
+      z-index: 99999;
+      transform-origin: left center;
+      transition: box-shadow 0.3s ease, transform 0.3s ease;
+    }
+    #time-controls:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 18px #00e5ff99;
+      border-color: #00e5ffaa;
+    }
 
-  /* --- Ручка панели --- */
-  #panel-handle {
-    width: 65px;
-    height: 6px;
-    background: rgba(255,255,255,0.35);
-    border-radius: 3px;
-    margin: 8px auto 10px auto;
-    cursor: pointer;
-    transition: background 0.3s ease;
-  }
-  #panel-handle:hover {
-    background: rgba(255,255,255,0.75);
-  }
+    /* === Кнопка Play === */
+    #play-btn {
+      background: radial-gradient(circle at 30% 30%, #00e5ff, #007a99);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      margin-right: 10px;
+      font-size: 13px;
+      box-shadow: 0 0 8px #00e5ff80;
+      transition: all 0.3s ease;
+    }
+    #play-btn:hover {
+      transform: scale(1.15);
+      box-shadow: 0 0 15px #00e5ff;
+    }
 
-  /* Заголовок */
-  #forecast-title {
-    font-size: 15px;
-    font-weight: bold;
-    color: #b8f4ff;
-    text-shadow: 0 0 6px #00bcd4;
-    margin-bottom: 6px;
-    letter-spacing: 0.4px;
-  }
+    /* === Ползунок времени === */
+    #time-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: linear-gradient(90deg, #00e5ff, #00bcd4);
+      border-radius: 4px;
+      outline: none;
+      margin-right: 10px;
+    }
+    #time-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 10px #00e5ff;
+      cursor: pointer;
+    }
 
-  /* Таблица */
-  #forecast-panel table {
-    border-collapse: collapse;
-    width: 2200px;
-    margin: 0 auto;
-    text-align: center;
-    font-size: 11px;
-    line-height: 1.4;
-    color: #dffaff;
-  }
+    #time-label {
+      font-size: 11px;
+      color: #d0f8ff;
+      min-width: 90px;
+      text-align: right;
+    }
 
-  #forecast-panel td {
-    border: 1px solid rgba(255,255,255,0.07);
-    padding: 3px 5px;
-    background: rgba(0,60,80,0.25);
-    transition: background 0.3s;
-  }
-  #forecast-panel td:hover {
-    background: rgba(0,200,255,0.25);
-  }
+    /* === Анимация загрузки === */
+    .loading {
+      animation: pulse 1.5s infinite;
+      color: #00e5ff;
+      font-weight: bold;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
 
-  .active-time {
-    background: rgba(0,188,212,0.6) !important;
-    color: #fff !important;
-  }
+    /* === надпись над флажком === */
+    .coord-label {
+      background: rgba(0,0,0,0.4);
+      color: #fff;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 11px;
+      border: none;
+      box-shadow: none;
+    }
 
-  .waves { color: #4de8ff; }
-  .wind { color: #ffd633; }
-  .temp { color: #ff9b7d; }
-  .rain { color: #00baff; }
-  .clouds { color: #b9ecff; }
-  .pressure { color: #ffaa33; }
+    /* === ЗАГРУЗКА — КРУЖОК === */
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.45);
+      display: none;              /* по умолчанию скрыт */
+      align-items: center;
+      justify-content: center;
+      z-index: 999999;
+    }
+    .loader {
+      border: 6px solid rgba(255,255,255,0.2);
+      border-top: 6px solid #00e5ff;
+      border-radius: 50%;
+      width: 55px;
+      height: 55px;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
 
-  /* === Узкая панель управления временем === */
-  #time-controls {
-    position: absolute;
-    bottom: 235px;
-    left: 1px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    width: 420px;
-    height: 28px;
-    background: rgba(0,40,60,0.3);
-    border: 1px solid #00bcd466;
-    border-radius: 10px;
-    box-shadow: 0 0 10px #00bcd455;
-    padding: 4px 10px;
-    backdrop-filter: blur(8px);
-    z-index: 99999;
-    transform-origin: left center;
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
-  }
-  #time-controls:hover {
-    transform: scale(1.03);
-    box-shadow: 0 0 18px #00e5ff99;
-    border-color: #00e5ffaa;
-  }
-
-  /* === Кнопка Play === */
-  #play-btn {
-    background: radial-gradient(circle at 30% 30%, #00e5ff, #007a99);
-    color: #fff;
-    border: none;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    margin-right: 10px;
-    font-size: 13px;
-    box-shadow: 0 0 8px #00e5ff80;
-    transition: all 0.3s ease;
-  }
-  #play-btn:hover {
-    transform: scale(1.15);
-    box-shadow: 0 0 15px #00e5ff;
-  }
-
-  /* === Ползунок времени === */
-  #time-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    height: 4px;
-    background: linear-gradient(90deg, #00e5ff, #00bcd4);
-    border-radius: 4px;
-    outline: none;
-    margin-right: 10px;
-  }
-  #time-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 0 10px #00e5ff;
-    cursor: pointer;
-  }
-
-  #time-label {
-    font-size: 11px;
-    color: #d0f8ff;
-    min-width: 90px;
-    text-align: right;
-  }
-
-  /* === Анимация загрузки === */
-  .loading {
-    animation: pulse 1.5s infinite;
-    color: #00e5ff;
-    font-weight: bold;
-  }
-  @keyframes pulse {
-    0% { opacity: 0.3; }
-    50% { opacity: 1; }
-    100% { opacity: 0.3; }
-  }
 
   </style>
+
+  <style>
+    /* график в правом верхнем углу */
+    #wind-chart-box {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+
+      background: rgba(0, 0, 0, 0.45);
+      padding: 10px;
+      border-radius: 10px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.2);
+
+      /* 🔥 новые размеры */
+      width: 400px;   /* было 260px */
+      height: 220px;  /* было 160px */
+
+      display: none;
+      z-index: 999999;
+    }
+
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
 
 <body>
   <div id="map"></div>
+
+  <div id="loading-overlay">
+    <div class="loader"></div>
+  </div>
+
 
   <div id="time-controls">
     <button id="play-btn">▶</button>
@@ -208,206 +278,377 @@
     <div id="forecast-title" class="loading">⏳ Ładowanie danych prognozy...</div>
   </div>
 
+  <div id="wind-chart-box" style="display:none;">
+    <canvas id="windChart"></canvas>
+  </div>
+
+
+
   <script>
-  /* =======================
-     1) КАРТА
-  ======================= */
-  const map = L.map("map", {
-    center: [55.5, 18.0],
-    zoom: 6,
-    worldCopyJump: true,
-    zoomControl: true
-  });
+    let marker = null;
+    /* =======================
+      1) КАРТА
+    ======================= */
+    const map = L.map("map", {
+      center: [54.3, 18.6],
+      zoom: 7,
+      worldCopyJump: true,
+      zoomControl: true
+    });
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 8,
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
+    map.on("click", function (e) {
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+      
+      // Показываем загрузку
+      showLoader();
 
-  /* =======================
-     2) ВЕТЕР
-  ======================= */
-  function buildVelocityData(intensity, timeStep) {
-    const nx = 80, ny = 40;
-    const header = { nx, ny, lo1: -180, la1: 90, dx: 360/nx, dy: 180/ny };
-    const uData = [], vData = [];
-    const t = timeStep * 0.35;
-    for (let j = 0; j < ny; j++) {
-      for (let i = 0; i < nx; i++) {
-        const u = intensity * (Math.sin((i + t) / 6) * Math.cos((j - t) / 8) + 0.25*Math.sin(i/9 + j/11 + t/3));
-        const v = intensity * (Math.cos((i - t) / 8) * Math.sin((j + t) / 6) + 0.25*Math.cos(i/10 - j/12 + t/4));
-        uData.push(u);
-        vData.push(v);
+      // Удаляем старый маркер
+      if (marker) {
+        map.removeLayer(marker);
       }
-    }
-    return [
-      { header: { ...header, parameterCategory: 2, parameterNumber: 2 }, data: uData },
-      { header: { ...header, parameterCategory: 2, parameterNumber: 3 }, data: vData }
-    ];
-  }
 
-  function createVelocityLayer(data) {
-    return L.velocityLayer({
-      data,
-      displayValues: false,
-      maxVelocity: 20,
-      velocityScale: 0.08,
-      particleMultiplier: 0.0015,
-      particleAge: 90,
-      lineWidth: 1,
-      colorScale: ['#00ffff','#00ff80','#ffff00','#ff8000','#ff0000']
+      // Создаём новый маркер
+      marker = L.marker([lat, lon])
+        .addTo(map)
+        .bindTooltip(
+          `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+          {
+            permanent: true,
+            direction: "top",
+            offset: [0, -10],
+            className: "coord-label"
+          }
+        )
+        .openTooltip();
+      // Отправляем координаты в FastAPI
+      sendCoordsToAPI(lat, lon).finally(() => hideLoader());
     });
-  }
 
-  let windLayer = createVelocityLayer(buildVelocityData(5, 0)).addTo(map);
-  let isFading = false;
 
-  function fadeSwapWindLayer(intensity, step) {
-    if (isFading) return;
-    isFading = true;
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 8,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
 
-    const nextData = buildVelocityData(intensity, step);
-    const nextLayer = createVelocityLayer(nextData).addTo(map);
-
-    const oldCanvas = windLayer?._canvas || null;
-    const newCanvas = nextLayer._canvas;
-
-    if (oldCanvas) oldCanvas.style.opacity = 1;
-    if (newCanvas) newCanvas.style.opacity = 0;
-
-    setTimeout(() => {
-      let alpha = 0;
-      const fadeDuration = 1500, stepMs = 40;
-      const interval = setInterval(() => {
-        alpha += stepMs / fadeDuration;
-        if (alpha <= 1) {
-          if (newCanvas) newCanvas.style.opacity = alpha.toFixed(2);
-          if (oldCanvas) oldCanvas.style.opacity = (1 - alpha).toFixed(2);
-        } else {
-          clearInterval(interval);
-          if (oldCanvas) oldCanvas.style.opacity = 0;
-          if (newCanvas) newCanvas.style.opacity = 1;
-          map.removeLayer(windLayer);
-          windLayer = nextLayer;
-          isFading = false;
+    /* =======================
+      2) ВЕТЕР
+    ======================= */
+    function buildVelocityData(intensity, timeStep) {
+      const nx = 80, ny = 40;
+      const header = { nx, ny, lo1: -180, la1: 90, dx: 360/nx, dy: 180/ny };
+      const uData = [], vData = [];
+      const t = timeStep * 0.35;
+      for (let j = 0; j < ny; j++) {
+        for (let i = 0; i < nx; i++) {
+          const u = intensity * (Math.sin((i + t) / 6) * Math.cos((j - t) / 8) + 0.25*Math.sin(i/9 + j/11 + t/3));
+          const v = intensity * (Math.cos((i - t) / 8) * Math.sin((j + t) / 6) + 0.25*Math.cos(i/10 - j/12 + t/4));
+          uData.push(u);
+          vData.push(v);
         }
-      }, stepMs);
-    }, 200);
-  }
+      }
+      return [
+        { header: { ...header, parameterCategory: 2, parameterNumber: 2 }, data: uData },
+        { header: { ...header, parameterCategory: 2, parameterNumber: 3 }, data: vData }
+      ];
+    }
 
-  /* =======================
-     3) ПРОГНОЗ
-  ======================= */
-  const days = 14, hoursStep = 6, pointsPerDay = 24 / hoursStep;
-  const totalSteps = days * pointsPerDay;
-  let forecast = null;
+    function createVelocityLayer(data) {
+      return L.velocityLayer({
+        data,
+        displayValues: false,
+        maxVelocity: 20,
+        velocityScale: 0.08,
+        particleMultiplier: 0.0015,
+        particleAge: 90,
+        lineWidth: 1,
+        colorScale: ['#00ffff','#00ff80','#ffff00','#ff8000','#ff0000']
+      });
+    }
 
-  fetch("http://localhost:8000/api/forecast")
-    .then(resp => resp.json())
-    .then(data => {
-      forecast = data;
-      document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
-      onTimeChange(0);
-    })
-    .catch(err => {
-      console.error("❌ Błąd ładowania danych:", err);
-      document.getElementById("forecast-panel").innerHTML =
-        "<div id='forecast-title'>⚠️ Nie udało się załadować danych prognozy</div>";
+    //let windLayer = createVelocityLayer(buildVelocityData(5, 0)).addTo(map);
+    let isFading = false;
+
+    function fadeSwapWindLayer(intensity, step) {
+      if (isFading) return;
+      isFading = true;
+
+      const nextData = buildVelocityData(intensity, step);
+      const nextLayer = createVelocityLayer(nextData).addTo(map);
+
+      const oldCanvas = windLayer?._canvas || null;
+      const newCanvas = nextLayer._canvas;
+
+      if (oldCanvas) oldCanvas.style.opacity = 1;
+      if (newCanvas) newCanvas.style.opacity = 0;
+
+      setTimeout(() => {
+        let alpha = 0;
+        const fadeDuration = 1500, stepMs = 40;
+        const interval = setInterval(() => {
+          alpha += stepMs / fadeDuration;
+          if (alpha <= 1) {
+            if (newCanvas) newCanvas.style.opacity = alpha.toFixed(2);
+            if (oldCanvas) oldCanvas.style.opacity = (1 - alpha).toFixed(2);
+          } else {
+            clearInterval(interval);
+            if (oldCanvas) oldCanvas.style.opacity = 0;
+            if (newCanvas) newCanvas.style.opacity = 1;
+            map.removeLayer(windLayer);
+            windLayer = nextLayer;
+            isFading = false;
+          }
+        }, stepMs);
+      }, 200);
+    }
+
+    function sendCoordsToAPI(lat, lon) {
+      // Показываем окно графика
+      document.getElementById("wind-chart-box").style.display = "block";
+      return fetch(`http://10.0.1.6:8000/api/forecast?lat=${lat}&lon=${lon}`)
+        .then(r => r.json())
+        .then(data => {
+          console.log("Ответ FastAPI:", data);
+
+          forecast = data;
+          document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
+          onTimeChange(0);
+          // 🔥 показываем мини-график ветра рядом с маркером
+          updateWindChart(data.wind, data.waves, data.time);
+        })
+        .catch(err => console.error("Ошибка запроса:", err));
+    }
+
+    /* ===========================
+      ПОЛНОЭКРАННАЯ ЗАГРУЗКА
+    =========================== */
+    function showLoader() {
+      document.getElementById("loading-overlay").style.display = "flex";
+    }
+
+    function hideLoader() {
+      document.getElementById("loading-overlay").style.display = "none";
+    }
+
+    /* =======================
+      3) ПРОГНОЗ
+    ======================= */
+    const days = 14, hoursStep = 6, pointsPerDay = 24 / hoursStep;
+    const totalSteps = days * pointsPerDay;
+    let forecast = null;
+
+    fetch("http://10.0.1.6:8000/api/forecast")
+      .then(resp => resp.json())
+      .then(data => {
+        forecast = data;
+        document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
+        onTimeChange(0);
+      })
+      .catch(err => {
+        console.error("❌ Błąd ładowania danych:", err);
+        document.getElementById("forecast-panel").innerHTML =
+          "<div id='forecast-title'>⚠️ Nie udało się załadować danych prognozy</div>";
+      });
+
+    /* ================================
+      3a) ОБРАБОТЧИК КЛИКА ПО РУЧКЕ
+    ================================ */
+    document.addEventListener("click", (e) => {
+      if (e.target.id === "panel-handle") {
+        const panel = document.getElementById("forecast-panel");
+        panel.classList.toggle("closed");
+      }
     });
 
-  /* ================================
-    3a) ОБРАБОТЧИК КЛИКА ПО РУЧКЕ
-  ================================ */
-  document.addEventListener("click", (e) => {
-    if (e.target.id === "panel-handle") {
-      const panel = document.getElementById("forecast-panel");
-      panel.classList.toggle("closed");
-    }
-  });
+    function buildForecastPanel() {
+      if (!forecast) return "";
+      const { time, waves, wind, temp, rain, clouds, pressure } = forecast;
+      const dateLabels = time.map(t => {
+        const d = new Date(t);
+        const day = d.getDate();
+        const month = d.toLocaleString('pl', { month: 'short' });
+        const hour = d.getHours().toString().padStart(2, "0");
+        const minute = d.getMinutes().toString().padStart(2, "0");
 
-  function buildForecastPanel() {
-    if (!forecast) return "";
-    const { time, waves, wind, temp, rain, clouds, pressure } = forecast;
-    const dateLabels = time.map(t => {
-      const d = new Date(t);
-      const day = d.getDate();
-      const month = d.toLocaleString('pl', { month: 'short' });
-      const hour = d.getHours().toString().padStart(2, "0");
-      const minute = d.getMinutes().toString().padStart(2, "0");
+        return `
+          <div style="font-size:10px; color:#b9ecff;">${day} ${month}</div>
+          <div style="font-size:12px; font-weight:bold; color:#fff;">${hour}:${minute}</div>
+        `;
+      });
 
       return `
-        <div style="font-size:10px; color:#b9ecff;">${day} ${month}</div>
-        <div style="font-size:12px; font-weight:bold; color:#fff;">${hour}:${minute}</div>
-      `;
-    });
-
-    return `
-      <div id="panel-handle"></div>     <!-- 🔥 ручка панели -->
-      <div id="forecast-title"></div>
-      <table id="forecast-table">
-        <tr><td>Data</td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}</tr>
-        <tr class="waves"><td>🌊 Fale (m)</td>${waves.map(v=>`<td>${v}</td>`).join("")}</tr>
-        <tr class="wind"><td>💨 Wiatr (kt)</td>${wind.map(v=>`<td>${v}</td>`).join("")}</tr>
-        <tr class="temp"><td>🌡 Temp (°C)</td>${temp.map(v=>`<td>${v}</td>`).join("")}</tr>
-        <tr class="rain"><td>🌧 Opady (mm)</td>${rain.map(v=>`<td>${v}</td>`).join("")}</tr>
-        <tr class="clouds"><td>☁️ Zachmurzenie (%)</td>${clouds.map(v => `<td>${v}</td>`).join("")}</tr>
-        <tr class="pressure"><td>🔽 Ciśnienie (hPa)</td>${pressure.map(v=>`<td>${v}</td>`).join("")}</tr>
-      </table>`;
-  }
-
-  function highlightTime(step) {
-    const tds = document.querySelectorAll("#forecast-table td");
-    tds.forEach(td => td.classList.remove("active-time"));
-    const col = step + 1;
-    document.querySelectorAll("#forecast-table tr").forEach(tr => {
-      const cell = tr.children[col];
-      if (cell) cell.classList.add("active-time");
-    });
-  }
-
-  /* =======================
-     4) ВРЕМЕННАЯ ШКАЛА + ПЛЕЙ
-  ======================= */
-  const slider = document.getElementById("time-slider");
-  const playBtn = document.getElementById("play-btn");
-  const timeLabel = document.getElementById("time-label");
-
-  let currentStep = 0, playing = false, timer = null;
-
-  function updateTimeLabel(step) {
-    const day = Math.floor(step / pointsPerDay);
-    const hour = (step % pointsPerDay) * 6;
-    const date = new Date(2025, 8, 1 + day, hour);
-    timeLabel.textContent = date.toLocaleString("pl", {
-      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-    });
-  }
-
-  function onTimeChange(step) {
-    if (!forecast) return;
-    currentStep = step;
-    highlightTime(currentStep);
-    updateTimeLabel(currentStep);
-    const windIntensity = 2 + (Number(forecast.wind[currentStep]) / 3);
-    fadeSwapWindLayer(windIntensity, currentStep);
-  }
-
-  slider.addEventListener("input", () => onTimeChange(+slider.value));
-
-  playBtn.addEventListener("click", () => {
-    playing = !playing;
-    playBtn.textContent = playing ? "⏸" : "▶";
-    if (playing) {
-      if (timer) clearInterval(timer);
-      timer = setInterval(() => {
-        currentStep = (currentStep + 1) % totalSteps;
-        slider.value = currentStep;
-        onTimeChange(currentStep);
-      }, 2400);
-    } else {
-      if (timer) clearInterval(timer);
+        <div id="panel-handle"></div>     <!-- 🔥 ручка панели -->
+        <div id="forecast-title"></div>
+        <table id="forecast-table">
+          <tr><td>Data</td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}</tr>
+          <tr class="waves"><td>🌊 Fale (m)</td>${waves.map(v=>`<td>${v}</td>`).join("")}</tr>
+          <tr class="wind"><td>💨 Wiatr (kt)</td>${wind.map(v=>`<td>${v}</td>`).join("")}</tr>
+          <tr class="temp"><td>🌡 Temp (°C)</td>${temp.map(v=>`<td>${v}</td>`).join("")}</tr>
+          <tr class="rain"><td>🌧 Opady (mm)</td>${rain.map(v=>`<td>${v}</td>`).join("")}</tr>
+          <tr class="clouds"><td>☁️ Zachmurzenie (%)</td>${clouds.map(v => `<td>${v}</td>`).join("")}</tr>
+          <tr class="pressure"><td>🔽 Ciśnienie (hPa)</td>${pressure.map(v=>`<td>${v}</td>`).join("")}</tr>
+        </table>`;
     }
-  });
+
+    function highlightTime(step) {
+      const tds = document.querySelectorAll("#forecast-table td");
+      tds.forEach(td => td.classList.remove("active-time"));
+      const col = step + 1;
+      document.querySelectorAll("#forecast-table tr").forEach(tr => {
+        const cell = tr.children[col];
+        if (cell) cell.classList.add("active-time");
+      });
+    }
+
+    /* =======================
+      4) ВРЕМЕННАЯ ШКАЛА + ПЛЕЙ
+    ======================= */
+    const slider = document.getElementById("time-slider");
+    const playBtn = document.getElementById("play-btn");
+    const timeLabel = document.getElementById("time-label");
+
+    let currentStep = 0, playing = false, timer = null;
+
+    function updateTimeLabel(step) {
+      const day = Math.floor(step / pointsPerDay);
+      const hour = (step % pointsPerDay) * 6;
+      const date = new Date(2025, 8, 1 + day, hour);
+      timeLabel.textContent = date.toLocaleString("pl", {
+        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+      });
+    }
+
+    function onTimeChange(step) {
+      if (!forecast) return;
+      currentStep = step;
+      highlightTime(currentStep);
+      updateTimeLabel(currentStep);
+      //const windIntensity = 2 + (Number(forecast.wind[currentStep]) / 3);
+      //fadeSwapWindLayer(windIntensity, currentStep);
+    }
+
+    slider.addEventListener("input", () => onTimeChange(+slider.value));
+
+    playBtn.addEventListener("click", () => {
+      playing = !playing;
+      playBtn.textContent = playing ? "⏸" : "▶";
+      if (playing) {
+        if (timer) clearInterval(timer);
+        timer = setInterval(() => {
+          currentStep = (currentStep + 1) % totalSteps;
+          slider.value = currentStep;
+          onTimeChange(currentStep);
+        }, 2400);
+      } else {
+        if (timer) clearInterval(timer);
+      }
+    });
+
+    /* Показывает график около флажка */
+    let windChart = null;
+
+    function updateWindChart(windValues, waveValues, times) {
+      const box = document.getElementById("wind-chart-box");
+      box.style.display = "block";
+
+      // Используем первые 20 пунктов (5 дней)
+      const wind5 = windValues.slice(0, 20);
+      const wave5 = waveValues.slice(0, 20);
+      const time5 = times.slice(0, 20);
+
+      if (!wind5 || wind5.length === 0) {
+        box.innerHTML = "<p style='color:white'>Brak danych</p>";
+        return;
+      }
+
+      const ctx = document.getElementById("windChart").getContext("2d");
+
+      if (windChart) windChart.destroy();
+
+      // Даты на X
+      const labels = time5.map(t => {
+        const d = new Date(t);
+        return d.toLocaleString("pl", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+      });
+
+      windChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Wiatr (kt)",
+              data: wind5,
+              borderColor: "rgba(0, 200, 255, 0.85)",
+              backgroundColor: "rgba(0, 200, 255, 0.25)",
+              borderWidth: 2,
+              tension: 0.35,
+              yAxisID: "y1"
+            },
+            {
+              label: "Fale (m)",
+              data: wave5,
+              borderColor: "rgba(255, 210, 0, 0.9)",
+              backgroundColor: "rgba(255, 210, 0, 0.25)",
+              borderWidth: 2,
+              tension: 0.35,
+              yAxisID: "y2"
+            }
+          ]
+        },
+        options: {
+          plugins: {
+            legend: { display: true, labels: { color: "white", font: { size: 10 } } }
+          },
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              ticks: {
+                color: "white",
+                maxRotation: 75,
+                minRotation: 45,
+                autoSkip: false,
+                font: { size: 8 }
+              },
+              grid: { color: "rgba(255,255,255,0.1)" }
+            },
+            y1: {
+              position: "left",
+              min: 0,
+              max: 30,
+              ticks: { stepSize: 5, color: "white" },
+              grid: { color: "rgba(255,255,255,0.15)" },
+              title: {
+                display: true,
+                text: "Wiatr (kt)",
+                color: "white",
+                font: { size: 11 }
+              }
+            },
+            y2: {
+              position: "right",
+              min: 0,
+              max: Math.max(...wave5) + 1,
+              ticks: { color: "white" },
+              grid: { drawOnChartArea: false },
+              title: {
+                display: true,
+                text: "Fale (m)",
+                color: "white",
+                font: { size: 11 }
+              }
+            }
+          }
+        }
+      });
+    }
+    
   </script>
 </body>
 </html>

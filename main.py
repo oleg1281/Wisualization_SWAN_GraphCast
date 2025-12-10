@@ -1,6 +1,11 @@
+from forecast import load_forecast
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import json
+from pathlib import Path
+import re
+import numpy as np
+import xarray as xr
 
 app = FastAPI()
 
@@ -13,8 +18,8 @@ app.add_middleware(
 )
 
 @app.get("/api/forecast")
-def get_forecast():
-    # 🟦 ВРЕМЕННО — просто читаем forecast_baltic.json
-    with open("forecast_baltic.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data
+def get_forecast(lat: float=55, lon: float=18):
+    lat, lon = round(lat, 1), round(lon, 1)
+    forecast = load_forecast(TARGET_LAT=lat, TARGET_LON=lon)
+
+    return forecast
