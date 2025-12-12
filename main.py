@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 @app.get("/api/forecast")
-def get_forecast(lat: float=55, lon: float=18):
+def get_forecast(lat: float=54.3, lon: float=18.6):
     lat, lon = round(lat, 1), round(lon, 1)
     forecast = load_forecast(TARGET_LAT=lat, TARGET_LON=lon)
 

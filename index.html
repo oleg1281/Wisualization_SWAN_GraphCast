@@ -24,12 +24,12 @@
       left: 0;
       width: 100%;
 
-      background: linear-gradient(180deg, rgba(0,40,60,0) 0%, rgba(0,25,40,1) 100%);
+      background: linear-gradient(180deg, rgba(0,40,60,0) 0%, rgba(0,20,30,0.95) 60%, rgba(0,10,15,1) 100%);
       backdrop-filter: blur(14px) saturate(130%);
       -webkit-backdrop-filter: blur(14px) saturate(130%);
 
       border-top: 1px solid rgba(0, 255, 255, 0.25);
-      box-shadow: 0 -6px 25px rgba(0, 255, 255, 0.18);
+      box-shadow: inset 0 -12px 20px rgba(0, 0, 0, 0.6);
 
       color: #dffaff;
       overflow-x: auto;
@@ -77,13 +77,17 @@
 
     /* Таблица */
     #forecast-panel table {
+      border: 1px solid rgba(0,255,255,0.25);
       border-collapse: collapse;
-      width: 2200px;
-      margin: 0 auto;
+      width: max-content;
+      
       text-align: center;
-      font-size: 11px;
+      font-size: 14px;
       line-height: 1.4;
       color: #dffaff;
+
+      /* 🔥 Добавляем видимую нижнюю границу */
+      border-bottom: 2px solid rgba(0,255,255,0.35);
     }
 
     #forecast-panel td {
@@ -111,9 +115,9 @@
     /* === Узкая панель управления временем === */
     #time-controls {
       position: absolute;
-      bottom: 235px;
+      bottom: 260px;
       left: 1px;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: flex-start;
       width: 420px;
@@ -239,7 +243,7 @@
       top: 10px;
       right: 10px;
 
-      background: rgba(0, 0, 0, 0.45);
+      background: rgba(0, 0, 0, 0.65);
       padding: 10px;
       border-radius: 10px;
       backdrop-filter: blur(6px);
@@ -256,11 +260,157 @@
 
   </style>
 
+  <style>
+    /* Кнопка Licencje */
+    #license-btn {
+      position: fixed;
+      bottom: 260px;
+      right: 10px;
+
+      background: rgba(0, 60, 80, 0.7);
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,255,255,0.35);
+
+      color: #dffaff;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+
+      box-shadow: 0 0 12px rgba(0,255,255,0.25);
+      backdrop-filter: blur(6px);
+
+      z-index: 99999;
+      transition: 0.25s;
+    }
+    #license-btn:hover {
+      background: rgba(0,150,200,0.9);
+      transform: scale(1.05);
+    }
+
+
+    /* Модальное затемнение */
+    #license-modal {
+      display: none; 
+      position: fixed;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 999999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Окно */
+    #license-content {
+      width: 480px;
+      max-width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+
+      background: rgba(0, 25, 40, 0.9);
+      padding: 20px 25px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,255,255,0.25);
+      box-shadow: 0 0 30px rgba(0,255,255,0.25);
+      
+      color: #dffaff;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    /* Закрыть (крестик) */
+    #license-close {
+      float: right;
+      cursor: pointer;
+      font-size: 18px;
+      color: #66eaff;
+      transition: 0.2s;
+    }
+    #license-close:hover {
+      color: #ffffff;
+      transform: scale(1.15);
+    }
+
+    #license-content h2 {
+      color: #99ecff;
+      margin-top: 0;
+      text-align: center;
+    }
+
+    #license-content h3 {
+      color: #4de8ff;
+      margin-bottom: 6px;
+    }
+
+    #license-content a {
+      color: #00e5ff;
+    }
+    #license-content a:hover {
+      text-decoration: underline;
+    }
+
+  </style>
+  <style>
+    /* Переключатель единиц ветра — большой и как кнопка Licencje */
+    #wind-toggle {
+      position: fixed;
+      bottom: 300px;
+      right: 10px;
+
+      background: rgba(0, 60, 80, 0.7);
+      padding: 8px 16px;      /* ← уменьшено */
+      border-radius: 8px;     /* ← чуть меньше */
+      border: 1px solid rgba(0,255,255,0.35);
+
+      color: #dffaff;
+      font-size: 12px;        /* ← уменьшено */
+      font-weight: bold;
+      cursor: pointer;
+
+      box-shadow: 0 0 12px rgba(0,255,255,0.28);  /* мягче */
+      backdrop-filter: blur(6px);
+
+      z-index: 99999;
+      transition: 0.25s;
+    }
+
+    #wind-toggle:hover {
+      background: rgba(0,150,200,0.9);
+      transform: scale(1.06);
+      box-shadow: 0 0 15px rgba(0,255,255,0.45);
+    }
+  </style>
+
+  <style>
+    /* Статусы работ */
+    .cell-go {
+      background: rgba(0, 180, 90, 0.35) !important;
+      color: #eafff3;
+      font-weight: 600;
+    }
+
+    .cell-warn {
+      background: rgba(255, 180, 0, 0.35) !important;
+      color: #fff7db;
+      font-weight: 600;
+    }
+
+    .cell-nogo {
+      background: rgba(220, 60, 60, 0.45) !important;
+      color: #ffecec;
+      font-weight: 700;
+    }
+  </style>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 </head>
 
 <body>
+  <button id="wind-toggle">Wiatr: m/s</button>
+
   <div id="map"></div>
 
   <div id="loading-overlay">
@@ -414,7 +564,7 @@
           document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
           onTimeChange(0);
           // 🔥 показываем мини-график ветра рядом с маркером
-          updateWindChart(data.wind, data.waves, data.time);
+          updateWindChart(data.wind_kt, data.waves, data.time);
         })
         .catch(err => console.error("Ошибка запроса:", err));
     }
@@ -462,7 +612,7 @@
 
     function buildForecastPanel() {
       if (!forecast) return "";
-      const { time, waves, wind, temp, rain, clouds, pressure } = forecast;
+      const { time, waves, wind_kt, temp, rain, clouds, pressure } = forecast;
       const dateLabels = time.map(t => {
         const d = new Date(t);
         const day = d.getDate();
@@ -480,9 +630,19 @@
         <div id="panel-handle"></div>     <!-- 🔥 ручка панели -->
         <div id="forecast-title"></div>
         <table id="forecast-table">
-          <tr><td>Data</td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}</tr>
-          <tr class="waves"><td>🌊 Fale (m)</td>${waves.map(v=>`<td>${v}</td>`).join("")}</tr>
-          <tr class="wind"><td>💨 Wiatr (kt)</td>${wind.map(v=>`<td>${v}</td>`).join("")}</tr>
+          <tr><td>Data</td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}<td style="min-width:20px;"></td></tr>
+          <tr class="waves"><td>🌊 Fale (m)</td>${forecast.waves.map(w =>`<td class="${waveClass(w)}">${w}</td>`).join("")}</tr>
+          <tr class="wind">
+            <td>💨 Wiatr ${useKt ? "(kt)" : "(m/s)"}</td>
+            ${forecast.wind_ms.map((wMs) => {
+              const cls = windClass(wMs);
+              const value = useKt
+                ? (wMs * 1.94384).toFixed(1)
+                : wMs.toFixed(1);
+
+              return `<td class="${cls}">${value}</td>`;
+            }).join("")}
+          </tr>
           <tr class="temp"><td>🌡 Temp (°C)</td>${temp.map(v=>`<td>${v}</td>`).join("")}</tr>
           <tr class="rain"><td>🌧 Opady (mm)</td>${rain.map(v=>`<td>${v}</td>`).join("")}</tr>
           <tr class="clouds"><td>☁️ Zachmurzenie (%)</td>${clouds.map(v => `<td>${v}</td>`).join("")}</tr>
@@ -576,16 +736,17 @@
         });
       });
 
+      // графики
       windChart = new Chart(ctx, {
         type: "line",
         data: {
           labels: labels,
           datasets: [
             {
-              label: "Wiatr (kt)",
+              label: useKt ? "Wiatr (kt)" : "Wiatr (m/s)",
               data: wind5,
-              borderColor: "rgba(0, 200, 255, 0.85)",
-              backgroundColor: "rgba(0, 200, 255, 0.25)",
+              borderColor: "rgba(255, 210, 0, 0.9)",
+              backgroundColor: "rgba(255, 210, 0, 0.25)",
               borderWidth: 2,
               tension: 0.35,
               yAxisID: "y1"
@@ -593,8 +754,8 @@
             {
               label: "Fale (m)",
               data: wave5,
-              borderColor: "rgba(255, 210, 0, 0.9)",
-              backgroundColor: "rgba(255, 210, 0, 0.25)",
+              borderColor: "rgba(0, 200, 255, 0.85)",
+              backgroundColor: "rgba(0, 200, 255, 0.25)",
               borderWidth: 2,
               tension: 0.35,
               yAxisID: "y2"
@@ -614,7 +775,7 @@
                 maxRotation: 75,
                 minRotation: 45,
                 autoSkip: false,
-                font: { size: 8 }
+                font: { size: 10 }
               },
               grid: { color: "rgba(255,255,255,0.1)" }
             },
@@ -626,7 +787,7 @@
               grid: { color: "rgba(255,255,255,0.15)" },
               title: {
                 display: true,
-                text: "Wiatr (kt)",
+                text: useKt ? "Wiatr (kt)" : "Wiatr (m/s)", 
                 color: "white",
                 font: { size: 11 }
               }
@@ -650,5 +811,83 @@
     }
     
   </script>
+
+  
+  <!-- Кнопка открытия -->
+  <div id="license-btn">ⓘ Licencje</div>
+
+  <!-- Модальное окно -->
+  <div id="license-modal">
+    <div id="license-content">
+      <span id="license-close">✕</span>
+
+      <h2>Licencje i źródła danych</h2>
+
+      <h3>🌐 NOAA / NWS</h3>
+      <p>
+        Dane meteorologiczne NOAA znajdują się w domenie publicznej i mogą być używane bez ograniczeń.<br>
+        <a href="https://www.weather.gov/disclaimer" target="_blank">https://www.weather.gov/disclaimer</a>
+      </p>
+
+      <h3>🧠 GraphCast — DeepMind / Google</h3>
+      <p>
+        Model GraphCast oraz wagi są objęte licencją <strong>CC BY-NC 4.0</strong>.<br>
+        © DeepMind / Google Research<br>
+        <a href="https://github.com/google-deepmind/graphcast" target="_blank">Repozytorium GraphCast</a>
+      </p>
+
+      <h3>🌊 SWAN — Delft University of Technology</h3>
+      <p>
+        Model SWAN © TU Delft. Dostępny bezpłatnie do badań i zastosowań inżynierskich.<br>
+        <a href="https://swanmodel.sourceforge.io/" target="_blank">https://swanmodel.sourceforge.io/</a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("license-btn").onclick = () =>
+      document.getElementById("license-modal").style.display = "flex";
+
+    document.getElementById("license-close").onclick = () =>
+      document.getElementById("license-modal").style.display = "none";
+
+    document.getElementById("license-modal").onclick = (e) => {
+      if (e.target === document.getElementById("license-modal"))
+        document.getElementById("license-modal").style.display = "none";
+    };
+  </script>
+  <script>
+    let useKt = false;
+
+    document.getElementById("wind-toggle").onclick = () => {
+        useKt = !useKt;
+        document.getElementById("wind-toggle").textContent = useKt ? "Wiatr: KT" : "Wiatr: m/s";
+
+        // перерисовать таблицу
+        document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
+
+        // перерисовать график
+        updateWindChart(
+            useKt ? forecast.wind_kt : forecast.wind_ms,
+            forecast.waves,
+            forecast.time
+        );
+    };
+
+  </script>
+
+  <script>
+    function waveClass(wave) {
+      if (wave > 1.5) return "cell-nogo";
+      if (wave >= 1.0) return "cell-warn";
+      return "cell-go";
+    }
+    function windClass(windMs) {
+      if (windMs > 10.0) return "cell-nogo";
+      if (windMs >= 9.0) return "cell-warn";
+      return "cell-go";
+    }
+  </script>
+
 </body>
 </html>

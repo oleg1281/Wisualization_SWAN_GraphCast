@@ -133,19 +133,28 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6):
     has_swan_data = not np.all(np.isnan(hs_values))
 
     # === NOAA — настоящая билинейная интерполяция ===
+
     point_noaa = ds_noaa_sel.sel(
         {lat_noaa: TARGET_LAT, lon_noaa: TARGET_LON},
         method="nearest"
     )
 
+    wind_ds = ds_noaa_sel[
+        ["10m_u_component_of_wind", "10m_v_component_of_wind", "2m_temperature", "total_precipitation_6hr", ]
+    ]
+    wind_point = wind_ds.interp(
+        {lat_noaa: TARGET_LAT, lon_noaa: TARGET_LON},
+        method="linear"
+    )
+
     # === 8. Переменные ===
     hs = point_swan["hs"]
-    t2m = point_noaa["2m_temperature"]
+    t2m = wind_point["2m_temperature"]
     msl = point_noaa["mean_sea_level_pressure"]
-    tp6 = point_noaa["total_precipitation_6hr"]
+    tp6 = wind_point["total_precipitation_6hr"]
     sh = point_noaa["specific_humidity"]
-    u10 = point_noaa["10m_u_component_of_wind"]
-    v10 = point_noaa["10m_v_component_of_wind"]
+    u10 = wind_point["10m_u_component_of_wind"]
+    v10 = wind_point["10m_v_component_of_wind"]
 
     # === 9. Приводим всё в удобный формат ===
     times = point_noaa["time"].values
@@ -165,29 +174,59 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6):
         (u10.values.astype(float).squeeze()) ** 2 +
         (v10.values.astype(float).squeeze()) ** 2
     )
+    wind_ms = np.round(wind_ms, 1)
+
     wind_kt = np.round(wind_ms * 1.943844, 1).tolist()
 
-    # облачность
-    sh_vals = sh.values.astype(float)
+    # === ОБЛАЧНОСТЬ ===
 
-    if sh_vals.ndim == 4:
-        max_per_time = np.nanmax(sh_vals, axis=(1, 2, 3))
-    elif sh_vals.ndim == 3:
-        max_per_time = np.nanmax(sh_vals, axis=(1, 2))
-    elif sh_vals.ndim == 2:
-        max_per_time = np.nanmax(sh_vals, axis=1)
-    else:
-        max_per_time = sh_vals
+    """temp3d = point_noaa["temperature"]
+    omega = point_noaa["vertical_velocity"]
 
-    mn = float(np.nanmin(max_per_time))
-    mx = float(np.nanmax(max_per_time))
+    # (time, batch, level) -> (time, level)
+    T = temp3d.values.astype(float).mean(axis=1)
+    w = omega.values.astype(float).mean(axis=1)
+    q = sh.values.astype(float).mean(axis=1)
 
-    if mx > mn:
-        clouds_pct = (max_per_time - mn) / (mx - mn) * 100.0
-    else:
-        clouds_pct = np.zeros_like(max_per_time)
+    levels = temp3d.coords["level"].values
 
-    clouds = np.round(clouds_pct).astype(int).tolist()
+    # уровни низко-средних облаков
+    level_mask = (levels <= 950) & (levels >= 700)
+
+    T_sel = T[:, level_mask]
+    w_sel = w[:, level_mask]
+    q_sel = q[:, level_mask]
+
+    # --- вертикальные движения ---
+    lift_strength = np.clip(
+        -np.nanmin(w_sel, axis=1) / 0.5,
+        0, 1
+    )
+
+    # --- относительная влажность ---
+    p_sel = levels[level_mask] * 100.0  # Pa
+
+    def compute_relative_humidity(q, T, p):
+        e = (q * p) / (0.622 + 0.378 * q) / 100.0
+        T_C = T - 273.15
+        es = 6.112 * np.exp((17.67 * T_C) / (T_C + 243.5))
+        return np.clip(e / es, 0.0, 1.0)
+
+    rh = compute_relative_humidity(q_sel, T_sel, p_sel[None, :])
+    rh_col = np.nanpercentile(rh, 90, axis=1)
+    rh_score = np.clip((rh_col - 0.75) / 0.25, 0, 1)
+
+    # --- осадки ---
+    rain_arr = np.asarray(rain_mm)
+
+    # --- итоговая облачность ---
+    cloud_score = (
+            rh_score * 0.4 +
+            lift_strength * 0.4 +
+            (rain_arr > 0.5) * 0.2
+    )
+
+    clouds = np.clip(cloud_score * 100, 0, 100).astype(int).tolist()"""
 
     end = time.perf_counter()
     print(f"Время выполнения load_forecast: {end - start:.3f} сек")
@@ -196,10 +235,11 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6):
     return {
         "time": time_str,
         "waves": waves,
-        "wind": wind_kt,
+        "wind_kt": wind_kt,
+        "wind_ms": wind_ms.tolist(),
         "temp": temp_C,
         "rain": rain_mm,
-        "clouds": clouds,
+        "clouds": np.zeros(50).tolist(),
         "pressure": pressure_hpa
     }
 
