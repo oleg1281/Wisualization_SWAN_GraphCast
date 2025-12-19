@@ -48,7 +48,7 @@
 
     /* === Когда закрыто — увезти вниз на 60% === */
   #forecast-panel.closed {
-    transform: translateY(50%);
+    transform: translateY(45%);
   }
 
     /* --- Ручка панели --- */
@@ -243,7 +243,7 @@
       top: 10px;
       right: 10px;
 
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.35);
       padding: 10px;
       border-radius: 10px;
       backdrop-filter: blur(6px);
@@ -264,7 +264,7 @@
     /* Кнопка Licencje */
     #license-btn {
       position: fixed;
-      bottom: 260px;
+      bottom: 285px;
       right: 10px;
 
       background: rgba(0, 60, 80, 0.7);
@@ -356,7 +356,7 @@
     /* Переключатель единиц ветра — большой и как кнопка Licencje */
     #wind-toggle {
       position: fixed;
-      bottom: 300px;
+      bottom: 320px;
       right: 10px;
 
       background: rgba(0, 60, 80, 0.7);
@@ -404,6 +404,45 @@
     }
   </style>
 
+  <style> 
+    /* 🌙 Ночные часы */
+  .night-hour {
+    background: rgba(120, 160, 200, 0.18) !important;
+    color: #cfe6ff;
+  }
+  </style>
+
+  <style>
+    /* вертикальная граница между днями */
+    .day-separator {
+      border-right: 2px solid rgba(0, 200, 255, 0.35) !important;
+      box-shadow: 2px 0 8px rgba(0, 200, 255, 0.15);
+    }
+  </style>
+
+  <style>
+    /* значения температур на карте */
+    .temp-number {
+      font-size: 10px;
+      font-weight: 600;
+      color: #ffffff;
+
+      background: rgba(0, 0, 0, 0.45);   /* ← ключевое */
+      padding: 2px 6px;
+      border-radius: 6px;
+
+      box-shadow:
+        0 0 4px rgba(0,0,0,0.6),
+        0 0 10px rgba(0,0,0,0.4);
+
+      text-shadow:
+        0 0 3px rgba(0,0,0,0.9);
+
+      pointer-events: none;
+      white-space: nowrap;
+    }
+  </style>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 </head>
@@ -446,6 +485,67 @@
       zoomControl: true
     });
 
+    // =======================
+    // 🔷 ПОЛИГОНЫ (GeoJSON)
+    // =======================
+    fetch("polygons.geojson")
+      .then(r => r.json())
+      .then(geojson => {
+        L.geoJSON(geojson, {
+          style: {
+            color: "rgba(0, 255, 255, 0.9)",   // контур
+            weight: 2,
+            fillColor: "rgba(0, 180, 220, 0.65)", // плотный морской цвет
+            fillOpacity: 0.28                  // ← ключевая строка
+          }
+        }).addTo(map);
+      });
+
+    // =======================
+    // TEMPERATURE NUMBERS LAYER
+    // =======================
+    const tempNumbersLayer = L.layerGroup().addTo(map);
+    tempNumbersLayer.getPane?.()?.style && (tempNumbersLayer.getPane().style.zIndex = 650);
+
+    function drawTemperatureNumbers(points) {
+      tempNumbersLayer.clearLayers();
+      const zoom = map.getZoom();
+
+      let step = 1;
+      if (zoom <= 5) step = 8;
+      else if (zoom <= 6) step = 4;
+      else if (zoom <= 7) step = 2;
+      else if (zoom <= 8) step = 1;
+
+      points.forEach(p => {
+        if (
+          Math.abs(p.lat) % step !== 0 ||
+          Math.abs(p.lon) % step !== 0
+        ) return;
+
+        const icon = L.divIcon({
+          className: "temp-number",
+          html: `<div>${p.temp}°C</div>`,
+          iconSize: [28, 16],
+          iconAnchor: [14, 8]
+        });
+
+        L.marker([p.lat, p.lon], { icon }).addTo(tempNumbersLayer);
+      });
+
+      updateTempScale();
+    }
+
+
+    function loadTemperatureGrid(timeIdx = 0) {
+      fetch(`http://10.0.1.6:8000/api/temp_grid?time_idx=${timeIdx}`)
+        .then(r => r.json())
+        .then(data => {
+          drawTemperatureNumbers(data.points);
+        })
+        .catch(err => console.error("Temp grid error:", err));
+    }
+
     map.on("click", function (e) {
       const lat = e.latlng.lat;
       const lon = e.latlng.lng;
@@ -475,11 +575,41 @@
       sendCoordsToAPI(lat, lon).finally(() => hideLoader());
     });
 
+    map.on("zoomend", () => {
+      loadTemperatureGrid(currentStep);
+    });
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 8,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    const esriSatellite = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 18,
+        attribution: "Tiles © Esri"
+      }
+    );
+
+    const esriLabels = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 18,
+        pane: "overlayPane"
+      }
+    );
+
+    const oceanLabels = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 18,
+        pane: "overlayPane"
+      }
+    );
+
+    esriSatellite.addTo(map);
+    oceanLabels.addTo(map);
+    esriLabels.addTo(map);
+
+    esriLabels.getContainer().style.opacity = "0.55";
+    oceanLabels.getContainer().style.opacity = "0.55";
+
 
     /* =======================
       2) ВЕТЕР
@@ -562,7 +692,7 @@
 
           forecast = data;
           document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
-          onTimeChange(0);
+          //onTimeChange(0);
           // 🔥 показываем мини-график ветра рядом с маркером
           updateWindChart(data.wind_kt, data.waves, data.time);
         })
@@ -592,7 +722,7 @@
       .then(data => {
         forecast = data;
         document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
-        onTimeChange(0);
+        //onTimeChange(0);
       })
       .catch(err => {
         console.error("❌ Błąd ładowania danych:", err);
@@ -613,6 +743,31 @@
     function buildForecastPanel() {
       if (!forecast) return "";
       const { time, waves, wind_kt, temp, rain, clouds, pressure } = forecast;
+
+      // === Группировка по дням ===
+      const dayGroups = [];
+      let currentDay = null;
+
+      time.forEach((t, i) => {
+        const d = new Date(t);
+        const dayKey =
+          d.getFullYear() + "-" +
+          String(d.getMonth() + 1).padStart(2, "0") + "-" +
+          String(d.getDate()).padStart(2, "0");
+
+        if (!currentDay || currentDay.key !== dayKey) {
+          currentDay = {
+            key: dayKey,
+            weekday: d.toLocaleString("pl", { weekday: "long" }),
+            isWeekend: d.getDay() === 0 || d.getDay() === 6,
+            count: 1
+          };
+          dayGroups.push(currentDay);
+        } else {
+          currentDay.count++;
+        }
+      });
+
       const dateLabels = time.map(t => {
         const d = new Date(t);
         const day = d.getDate();
@@ -626,10 +781,36 @@
         `;
       });
 
+      setTimeout(() => {
+        const table = document.getElementById("forecast-table");
+        if (!table) return;
+
+        let colIndex = 1; // первая колонка — названия строк
+
+        dayGroups.forEach(day => {
+          colIndex += day.count; // конец дня
+
+          // добавляем линию ко всем строкам
+          Array.from(table.rows).forEach(row => {
+            const cell = row.cells[colIndex - 1];
+            if (cell) cell.classList.add("day-separator");
+          });
+        });
+      }, 0);
+
       return `
         <div id="panel-handle"></div>     <!-- 🔥 ручка панели -->
         <div id="forecast-title"></div>
         <table id="forecast-table">
+          <tr>
+            <td></td>
+            ${dayGroups.map(d => `
+              <td colspan="${d.count}"
+                  class="day-header ${d.isWeekend ? "weekend" : ""}">
+                ${d.weekday}
+              </td>
+            `).join("")}
+          </tr>
           <tr><td>Data</td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}<td style="min-width:20px;"></td></tr>
           <tr class="waves"><td>🌊 Fale (m)</td>${forecast.waves.map(w =>`<td class="${waveClass(w)}">${w}</td>`).join("")}</tr>
           <tr class="wind">
@@ -795,7 +976,7 @@
             y2: {
               position: "right",
               min: 0,
-              max: Math.max(...wave5) + 1,
+              max: 3,
               ticks: { color: "white" },
               grid: { drawOnChartArea: false },
               title: {
@@ -809,7 +990,20 @@
         }
       });
     }
-    
+
+    // =======================
+    // 🚀 АВТОСТАРТ — ГДАНЬСК
+    // =======================
+    const START_LAT = 54.3520;
+    const START_LON = 18.6466;
+
+    map.whenReady(() => {
+      map.fire("click", {
+        latlng: L.latLng(START_LAT, START_LON)
+      });
+    });
+
+    loadTemperatureGrid(0);
   </script>
 
   
@@ -825,24 +1019,49 @@
 
       <h3>🌐 NOAA / NWS</h3>
       <p>
-        Dane meteorologiczne NOAA znajdują się w domenie publicznej i mogą być używane bez ograniczeń.<br>
-        <a href="https://www.weather.gov/disclaimer" target="_blank">https://www.weather.gov/disclaimer</a>
+        Dane meteorologiczne NOAA (National Oceanic and Atmospheric Administration)
+        znajdują się w domenie publicznej (Public Domain) i mogą być używane
+        bez ograniczeń, również w celach komercyjnych.<br>
+        <a href="https://www.weather.gov/disclaimer" target="_blank">
+          https://www.weather.gov/disclaimer
+        </a>
       </p>
 
       <h3>🧠 GraphCast — DeepMind / Google</h3>
       <p>
-        Model GraphCast oraz wagi są objęte licencją <strong>CC BY-NC 4.0</strong>.<br>
+        Model prognostyczny GraphCast oraz jego wagi są objęte licencją
+        <strong>Creative Commons CC BY-NC 4.0</strong> (bez użycia komercyjnego).<br>
+        Prognozy oparte na modelu GraphCast są wykorzystywane
+        <strong>wyłącznie do wewnętrznych celów analitycznych, badawczych
+        i wspomagania decyzji</strong> w ramach działalności firmy.
+        Dane te nie są sprzedawane ani udostępniane publicznie.<br>
         © DeepMind / Google Research<br>
-        <a href="https://github.com/google-deepmind/graphcast" target="_blank">Repozytorium GraphCast</a>
+        <a href="https://github.com/google-deepmind/graphcast" target="_blank">
+          https://github.com/google-deepmind/graphcast
+        </a>
       </p>
 
       <h3>🌊 SWAN — Delft University of Technology</h3>
       <p>
-        Model SWAN © TU Delft. Dostępny bezpłatnie do badań i zastosowań inżynierskich.<br>
-        <a href="https://swanmodel.sourceforge.io/" target="_blank">https://swanmodel.sourceforge.io/</a>
+        Model falowy SWAN (Simulating WAves Nearshore) © Delft University of Technology.<br>
+        Oprogramowanie dostępne jest bezpłatnie do zastosowań naukowych,
+        badawczych oraz inżynierskich.<br>
+        <a href="https://swanmodel.sourceforge.io/" target="_blank">
+          https://swanmodel.sourceforge.io/
+        </a>
       </p>
+
+      <h3>🗺 Mapy bazowe</h3>
+      <p>
+        Mapy bazowe (podkłady kartograficzne) dostarczane są przez
+        <strong>Esri</strong> i wykorzystywane wyłącznie jako warstwa wizualna
+        do prezentacji danych prognostycznych.<br>
+        © Esri, Maxar, Earthstar Geographics, CNES/Airbus, USGS, NOAA
+      </p>
+
     </div>
   </div>
+
 
   <script>
     document.getElementById("license-btn").onclick = () =>

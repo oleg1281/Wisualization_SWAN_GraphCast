@@ -63,6 +63,42 @@ def guess_lat_lon_names(ds: xr.Dataset):
     return lat, lon
 
 
+def load_temperature_grid(ds_noaa):
+    time_idx = 0
+    """
+    Возвращает температуру 2m_temperature
+    В УЗЛАХ СЕТКИ (1° × 1°), БЕЗ интерполяции
+    """
+
+    # координаты
+    lat_name, lon_name = guess_lat_lon_names(ds_noaa)
+
+    lats = ds_noaa[lat_name].values
+    lons = ds_noaa[lon_name].values
+
+    # температура в Кельвинах → °C
+    t2m = ds_noaa["2m_temperature"].isel(time=time_idx) - 273.15
+    t2m_vals = t2m.values.astype(float)
+
+    points = []
+
+    for i, lat in enumerate(lats):
+        for j, lon in enumerate(lons):
+            if not (45 <= lat <= 60 and 0 <= lon <= 50):
+                continue
+            val = t2m_vals[time_idx, i, j]
+            if np.isnan(val):
+                continue
+
+            points.append({
+                "lat": float(lat),
+                "lon": float(lon),
+                "temp": round(float(val), 1)
+            })
+
+    return points
+
+
 # ----------------------------------------------------------
 #  ГЛАВНАЯ ФУНКЦИЯ —
 # ----------------------------------------------------------
@@ -85,6 +121,8 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6):
     # === 2. Загружаем данные ===
     ds_swan = xr.open_dataset(latest_swan)
     ds_noaa = xr.open_dataset(latest_noaa, decode_timedelta=False)
+
+    #load_temperature_grid(ds_noaa)
 
     # === 3. NOAA — исправляем время ===
     time_raw = ds_noaa["time"].values
@@ -142,6 +180,7 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6):
     wind_ds = ds_noaa_sel[
         ["10m_u_component_of_wind", "10m_v_component_of_wind", "2m_temperature", "total_precipitation_6hr", ]
     ]
+
     wind_point = wind_ds.interp(
         {lat_noaa: TARGET_LAT, lon_noaa: TARGET_LON},
         method="linear"
