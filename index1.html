@@ -122,6 +122,7 @@
     .wind { color: #ffd633; }
     .temp { color: #ff9b7d; }
     .rain { color: #00baff; }
+    .clouds { color: #b9ecff; }
     .pressure { color: #ffaa33; }
 
     /* === Узкая панель управления временем === */
@@ -255,7 +256,7 @@
       top: 10px;
       right: 10px;
 
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.35);
       padding: 10px;
       border-radius: 10px;
       backdrop-filter: blur(6px);
@@ -264,68 +265,12 @@
 
       /* 🔥 новые размеры */
       width: 400px;   /* было 260px */
-      min-height: 320px;  /* было 160px */
+      height: 220px;  /* было 160px */
 
       display: none;
       z-index: 999999;
-
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
     }
 
-    .chart-top {
-      height: 130px;
-    }
-
-    .chart-bottom {
-      height: 160px;
-    }
-
-    .chart-top canvas,
-    .chart-bottom canvas {
-      width: 100% !important;
-      height: 100% !important;
-      display: block;
-    }
-  </style>
-    
-  <style>
-    #charts-legend {
-      display: flex;
-      justify-content: center;
-      gap: 14px;
-      margin-bottom: 4px;
-      font-size: 11px;
-      color: white;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .legend-item::before {
-      content: "";
-      width: 26px;
-      height: 10px;
-      border-radius: 2px;
-      display: inline-block;
-    }
-
-    /* цвета как в графиках */
-    .legend-item.wind::before {
-      border: 2px solid rgba(255,210,0,0.95);
-    }
-
-    .legend-item.waves::before {
-      border: 2px solid rgba(0,200,255,0.9);
-    }
-
-    .legend-item.temp::before {
-      border: 2px solid rgba(255,140,100,0.95);
-    }
   </style>
 
   <style>
@@ -673,22 +618,11 @@
     <div id="forecast-title" class="loading">⏳ Ładowanie danych prognozy...</div>
   </div>
 
-  <div id="wind-chart-box">
-    <div id="charts-legend">
-      <span class="legend-item wind">Wiatr (m/s)</span>
-      <span class="legend-item waves">Fale (m)</span>
-      <span class="legend-item temp">Temperatura (°C)</span>
-    </div>
-
-    <div class="chart-top">
-      <canvas id="windWaveChart"></canvas>
-    </div>
-
-    <div class="chart-bottom">
-      <canvas id="tempChart"></canvas>
-    </div>
-
+  <div id="wind-chart-box" style="display:none;">
+    <canvas id="windChart"></canvas>
   </div>
+
+
 
   <script>
     let marker = null;
@@ -699,9 +633,7 @@
     ======================= */
     const map = L.map("map", {
       center: [54.3, 18.6],
-      zoom: 7,
-      minZoom: 4,   //  дальше не отдалиться
-      maxZoom: 10
+      zoom: 6
     });
 
     map.createPane("labels");
@@ -715,7 +647,7 @@
     // =======================
     // 🔷 ПОЛИГОНЫ (GeoJSON)
     // =======================
-    fetch("/static/polygons.geojson")
+    fetch("polygons.geojson")
       .then(r => r.json())
       .then(geojson => {
         L.geoJSON(geojson, {
@@ -811,42 +743,46 @@
     });
 
     // --- БАЗОВЫЕ КАРТЫ ---
-    const openTopoMap = L.tileLayer(
-      "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-      {
-        maxZoom: 10,
-        attribution:
-          '© <a href="https://opentopomap.org">OpenTopoMap</a> ' +
-          '(© OpenStreetMap contributors, SRTM)'
-      }
+    const esriSatellite = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 18 }
     );
 
     const esriTopo = L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
-      {
-        maxZoom: 10,
-        attribution:
-          '© <a href="https://stadiamaps.com/">Stadia Maps</a>, ' +
-          '© <a href="https://stamen.com/">Stamen Design</a>, ' +
-          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      }
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 18 }
     );
 
     const osm = L.tileLayer(
       "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 10 }
+      { maxZoom: 19 }
     );
 
-    openTopoMap.addTo(map);
+
+    // --- ПОДПИСИ ---
+    const esriLabels = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { pane: "labels" }
+    );
+
+    const oceanLabels = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}",
+      { pane: "labels" }
+    );
+
+    esriSatellite.addTo(map);
+    esriLabels.addTo(map);
+    oceanLabels.addTo(map);
     
     const baseMaps = {
-      "🛰️ Satellite": openTopoMap,
+      "🛰️ Satellite": esriSatellite,
       "🗺️ Topo": esriTopo,
       "🧭 OSM": osm
     };
 
     const overlays = {
-      
+      "📝 Cities": esriLabels,
+      "🌊 Seas": oceanLabels
     };
 
     /*
@@ -939,37 +875,14 @@
           document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
           //onTimeChange(0);
           // 🔥 показываем мини-график ветра рядом с маркером
-          updatewindWaveChart(
+          updateWindChart(
             useKt ? data.wind_kt : data.wind_ms,
             data.waves,
             data.time
           );
-          updateTempChart(data.temp, data.time);
+
         })
         .catch(err => console.error("Ошибка запроса:", err));
-    }
-
-    function initStartPoint(lat, lon) {
-      showLoader();
-
-      if (marker) map.removeLayer(marker);
-
-      marker = L.marker([lat, lon])
-        .addTo(map)
-        .bindTooltip(
-          `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
-          {
-            permanent: true,
-            direction: "top",
-            offset: [0, -10],
-            className: "coord-label"
-          }
-        )
-        .openTooltip();
-
-      map.setView([lat, lon], 7);
-
-      sendCoordsToAPI(lat, lon).finally(hideLoader);
     }
 
     /* ===========================
@@ -990,6 +903,19 @@
     const totalSteps = days * pointsPerDay;
     let forecast = null;
 
+    fetch("http://10.0.1.6:8000/api/forecast")
+      .then(resp => resp.json())
+      .then(data => {
+        forecast = data;
+        document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
+        //onTimeChange(0);
+      })
+      .catch(err => {
+        console.error("❌ Błąd ładowania danych:", err);
+        document.getElementById("forecast-panel").innerHTML =
+          "<div id='forecast-title'>⚠️ Nie udało się załadować danych prognozy</div>";
+      });
+
     /* ================================
       3a) ОБРАБОТЧИК КЛИКА ПО РУЧКЕ
     ================================ */
@@ -1004,7 +930,7 @@
 
     function buildForecastPanel() {
       if (!forecast) return "";
-      const { time, waves, wind_kt, wind_ms, wind_arrow, temp, rain, pressure } = forecast;
+      const { time, waves, wind_kt, temp, rain, clouds, pressure } = forecast;
 
       // === Группировка по дням ===
       const dayGroups = [];
@@ -1084,24 +1010,20 @@
           </tr>
           <tr><td></td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}<td style="min-width:20px;"></td></tr>
           <tr class="waves"><td>🌊 Fale (m)</td>${forecast.waves.map(w =>`<td class="${waveClass(w)}">${w}</td>`).join("")}</tr>
-          
           <tr class="wind">
             <td>💨 Wiatr ${useKt ? "(kt)" : "(m/s)"}</td>
-            ${(useKt ? wind_kt : wind_ms)
-              .map((w, i) => `
-                <td class="${windClass(w)}">
-                  ${w}
-                  <span style="font-size:14px; margin-left:2px;">
-                    ${wind_arrow[i]}
-                  </span>
-                </td>
-              `)
-              .join("")}
-          </tr>
+            ${forecast.wind_ms.map((wMs) => {
+              const cls = windClass(wMs);
+              const value = useKt
+                ? (wMs * 1.94384).toFixed(1)
+                : wMs.toFixed(1);
 
+              return `<td class="${cls}">${value}</td>`;
+            }).join("")}
+          </tr>
           <tr class="temp"><td>🌡 Temp (°C)</td>${temp.map(v=>`<td>${v}</td>`).join("")}</tr>
           <tr class="rain"><td>🌧 Opady (mm)</td>${rain.map(v=>`<td>${v}</td>`).join("")}</tr>
-          
+          <tr class="clouds"><td>☁️ Zachmurzenie (%)</td>${clouds.map(v => `<td>${v}</td>`).join("")}</tr>
           <tr class="pressure"><td>🔽 Ciśnienie (hPa)</td>${pressure.map(v=>`<td>${v}</td>`).join("")}</tr>
         </table>`;
     }
@@ -1161,26 +1083,25 @@
     });
 
     /* Показывает график около флажка */
-    let windWaveChart = null;
-    let tempChart = null;
+    let windChart = null;
 
-    function updatewindWaveChart(windValues, waveValues, times) {
+    function updateWindChart(windValues, waveValues, times) {
       const box = document.getElementById("wind-chart-box");
-      box.style.display = "flex";
+      box.style.display = "block";
 
       // Используем первые 20 пунктов (5 дней)
-      const wind5 = windValues.slice(0, 18);
-      const wave5 = waveValues.slice(0, 18);
-      const time5 = times.slice(0, 18);
+      const wind5 = windValues.slice(0, 20);
+      const wave5 = waveValues.slice(0, 20);
+      const time5 = times.slice(0, 20);
 
       if (!wind5 || wind5.length === 0) {
         box.innerHTML = "<p style='color:white'>Brak danych</p>";
         return;
       }
 
-      const ctx = document.getElementById("windWaveChart").getContext("2d");
+      const ctx = document.getElementById("windChart").getContext("2d");
 
-      if (windWaveChart) windWaveChart.destroy();
+      if (windChart) windChart.destroy();
 
       // Даты на X
       const labels = time5.map(t => {
@@ -1194,7 +1115,7 @@
       });
 
       // графики
-      windWaveChart = new Chart(ctx, {
+      windChart = new Chart(ctx, {
         type: "line",
         data: {
           labels: labels,
@@ -1221,27 +1142,20 @@
         },
         options: {
           plugins: {
-            legend: { display: false }
+            legend: { display: true, labels: { color: "white", font: { size: 10 } } }
           },
           responsive: true,
           maintainAspectRatio: false,
           scales: {
             x: {
-              offset: false,              // 🔥 КЛЮЧЕВОЕ
-              bounds: "ticks",            // 🔥
               ticks: {
-                source: "labels",         // 🔥
-                display: false,
-                font: {
-                  size: 11,                // ← ТАКОЙ ЖЕ, КАК У ТЕМПЕРАТУРЫ
-                  weight: "bold"
-                }
+                color: "white",
+                maxRotation: 75,
+                minRotation: 45,
+                autoSkip: false,
+                font: { size: 10 }
               },
-              grid: {
-                display: true,
-                color: "rgba(255,255,255,0.1)",
-                lineWidth: 1
-              }
+              grid: { color: "rgba(255,255,255,0.1)" }
             },
 
             // 🟡 ВЕТЕР
@@ -1251,13 +1165,7 @@
               max: useKt ? 40 : 20,
               ticks: {
                 stepSize: useKt ? 5 : 2.5,
-                color: "#ffd200",
-
-                // 🔥 ФИКС ШИРИНЫ
-                callback: (value) => {
-                  const v = Math.round(value).toString();
-                  return v.padStart(3, " ");
-                }
+                color: "#ffd200"          // ← ЖЁЛТЫЙ
               },
               grid: {
                 color: "rgba(255, 210, 0, 0.25)"   // мягкая жёлтая сетка
@@ -1302,148 +1210,17 @@
     const START_LON = 18.6466;
 
     map.whenReady(() => {
-      initStartPoint(START_LAT, START_LON);
+      map.fire("click", {
+        latlng: L.latLng(START_LAT, START_LON)
+      });
     });
 
     loadTemperatureGrid(0);
   </script>
 
   <script>
-    function updateTempChart(tempValues, times) {
-      const ctx = document.getElementById("tempChart").getContext("2d");
-
-      if (tempChart) tempChart.destroy();
-
-      const temp5 = tempValues.slice(0, 20);
-      const time5 = times.slice(0, 20);
-
-      // --- гарантируем минимум 5 делений ---
-      const minVal = Math.min(...temp5);
-      const maxVal = Math.max(...temp5);
-
-      const step = 2;           // шаг °C
-      const desiredTicks = 5;   // 🔥 хотим минимум 6 подписей
-      const paddingSteps = 1;   // отступ сверху/снизу (1 шаг = 2°C)
-
-      // 1) базовый диапазон от данных + паддинг
-      let yMin = minVal - step * paddingSteps;
-      let yMax = maxVal + step * paddingSteps;
-
-      // 2) округляем к шагу
-      yMin = Math.floor(yMin / step) * step;
-      yMax = Math.ceil(yMax / step) * step;
-
-      // 3) гарантируем минимум 6 подписей => 5 интервалов
-      const minRange = step * (desiredTicks - 1);
-      if (yMax - yMin < minRange) {
-        const center = (yMin + yMax) / 2;
-        const half = minRange / 2;
-        yMin = Math.floor((center - half) / step) * step;
-        yMax = Math.ceil((center + half) / step) * step;
-      }
-
-      // 4) если 0 внутри диапазона — делаем так, чтобы 0 был ТИКом
-      // (для step=2 достаточно, чтобы yMin был кратен 2 — он уже кратен, но подстрахуем)
-      if (yMin < 0 && yMax > 0) {
-        // гарантируем, что 0 лежит на сетке step от yMin
-        const offset = (0 - yMin) % step;
-        if (offset !== 0) yMin -= offset;
-      }
-
-      const labels = time5.map(t => {
-        const d = new Date(t);
-        return d.toLocaleString("pl", {
-          day: "2-digit",
-          month: "short",
-          hour: "2-digit"
-        });
-      });
-
-      tempChart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            label: "Temperatura (°C)",
-            data: temp5,
-            borderColor: "rgba(255,140,100,0.95)",
-            backgroundColor: "rgba(255,140,100,0.25)",
-            borderWidth: 2,
-            tension: 0.35
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
-          scales: {
-            x: {
-              offset: false,
-              bounds: "ticks",
-              ticks: {
-                source: "labels",
-                color: "white",
-                maxRotation: 75,
-                minRotation: 45,
-
-                // 🔥 ВОТ ЭТО УВЕЛИЧИВАЕТ ДАТЫ
-                font: {
-                  size: 11,          // ← было 10
-                  weight: "bold"
-                },
-                padding: 8           // ← отступ от графика
-              },
-              grid: {
-                color: "rgba(255,255,255,0.1)"
-              }
-            },
-            y: {
-              min: yMin,
-              max: yMax,
-
-              ticks: {
-                color: "#ff9b7d",
-                font: {
-                  size: 10,          // ↓ на 1px
-                  weight: "500"      // ← ВАЖНО: вместо bold
-                },
-                stepSize: step,
-                autoSkip: false,
-                maxTicksLimit: 20,
-                callback: (value) => {
-                  return value.toFixed(0).padStart(3, " ");
-                }
-              },
-
-              title: {
-                display: true,
-                text: "Temperatura °C",
-                color: "#ff9b7d",
-                font: { size: 12, weight: "bold" }
-              },
-
-              grid: {
-                color: (ctx) => {
-                  if (ctx.tick.value === 0) {
-                    return "rgba(255,140,100,0.55)"; // мягкий цвет
-                  }
-                  return "rgba(255,255,255,0.1)";
-                },
-                lineWidth: (ctx) => ctx.tick.value === 0 ? 1.5 : 1,
-                borderDash: (ctx) => ctx.tick.value === 0 ? [6, 6] : []
-              }
-            }
-          }
-        }
-      });
-    }
-  </script>
-
-  <script>
     const baseLayers = [
-      { name: "🛰️ Satellite", layer: openTopoMap },
+      { name: "🛰️ Satellite", layer: esriSatellite },
       { name: "🗺️ Topo",      layer: esriTopo },
       { name: "🧭 OSM",       layer: osm }
     ];
@@ -1587,45 +1364,13 @@
       </p>
 
       <h3>🗺 Mapy bazowe</h3>
-
       <p>
-        Mapy bazowe wykorzystywane w systemie pochodzą z otwartych źródeł
-        kartograficznych i są używane wyłącznie jako warstwa wizualna
-        do prezentacji danych prognostycznych.
+        Mapy bazowe (podkłady kartograficzne) dostarczane są przez
+        <strong>Esri</strong> i wykorzystywane wyłącznie jako warstwa wizualna
+        do prezentacji danych prognostycznych.<br>
+        © Esri, Maxar, Earthstar Geographics, CNES/Airbus, USGS, NOAA
       </p>
 
-      <ul style="font-size: 0.9em; line-height: 1.55; padding-left: 18px;">
-        <li>
-          <strong>OpenTopoMap</strong> — © OpenTopoMap contributors, SRTM,
-          dane © OpenStreetMap contributors<br>
-          Licencja:
-          <a href="https://opentopomap.org/about" target="_blank">
-            CC BY-SA 3.0
-          </a>
-        </li>
-
-        <li>
-          <strong>CartoDB Voyager</strong> — © Stadia Maps, © Stamen Design,
-          © OpenStreetMap contributors<br>
-          Licencja:
-          <a href="https://stadiamaps.com/attribution/" target="_blank">
-            Open Data / ODbL
-          </a>
-        </li>
-
-        <li>
-          <strong>OpenStreetMap</strong> — © OpenStreetMap contributors<br>
-          Licencja:
-          <a href="https://www.openstreetmap.org/copyright" target="_blank">
-            Open Database License (ODbL)
-          </a>
-        </li>
-      </ul>
-
-      <p style="font-size: 0.85em; opacity: 0.85;">
-        Warstwy mapowe służą wyłącznie do celów wizualizacyjnych
-        i nie stanowią danych nawigacyjnych ani referencyjnych.
-      </p>
     </div>
   </div>
 
@@ -1653,7 +1398,7 @@
       btn.classList.toggle("active", useKt);   // ← 🔥 ВОТ ЭТО
 
       document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
-      updatewindWaveChart(
+      updateWindChart(
         useKt ? forecast.wind_kt : forecast.wind_ms,
         forecast.waves,
         forecast.time
@@ -1667,19 +1412,10 @@
       if (wave >= 1.0) return "cell-warn";
       return "cell-go";
     }
-
-    function windClass(value) {
-      if (useKt) {
-        // --- KT ---
-        if (value > 19) return "cell-nogo";   // > 20 kt
-        if (value > 17) return "cell-warn";  // 16–20 kt
-        return "cell-go";                     // < 16 kt
-      } else {
-        // --- m/s ---
-        if (value >= 10.0) return "cell-nogo";
-        if (value >= 9.0) return "cell-warn";
-        return "cell-go";
-      }
+    function windClass(windMs) {
+      if (windMs > 10.0) return "cell-nogo";
+      if (windMs >= 9.0) return "cell-warn";
+      return "cell-go";
     }
   </script>
   
