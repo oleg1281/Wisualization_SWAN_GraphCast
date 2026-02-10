@@ -10,10 +10,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pdf_report import build_forecast_pdf
 
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-from reportlab.lib import colors
+#from reportlab.lib.pagesizes import A4
+#from reportlab.pdfgen import canvas
+#from reportlab.lib.utils import ImageReader
+#from reportlab.lib import colors
 
 from forecast import (
     load_forecast,
@@ -53,7 +53,7 @@ def index():
     return INDEX_HTML.read_text(encoding="utf-8")
 
 @app.get("/api/forecast")
-<<<<<<< HEAD
+
 def get_forecast(
     lat: float = 54.3,
     lon: float = 18.6,
@@ -70,13 +70,6 @@ def get_forecast(
         TARGET_LON=lon,
         model=model            # ← ВАЖНО
     )
-
-=======
-def get_forecast(lat: float=54.3, lon: float=18.6):
-    lat, lon = round(lat, 1), round(lon, 1)
-    forecast = load_forecast(TARGET_LAT=lat, TARGET_LON=lon)
-    #print(lat, lon)
->>>>>>> 93bd6f4 (06.02.2025 server przed uruchomilianiem)
     return forecast
 
 

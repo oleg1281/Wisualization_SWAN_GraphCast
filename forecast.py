@@ -9,17 +9,19 @@ from pathlib import Path
 import re
 import numpy as np
 import xarray as xr
-
+from pathlib import Path
 # === НАСТРОЙКИ ===
-<<<<<<< HEAD
-SWAN_DIR = Path(r"Z:\NOAA\predict_swan")
-PREDICT_NOAA_DIR = Path(r"Z:\NOAA\predict_noaa")
-GFS_DIR = Path(r"Z:\NOAA\data_gfs")
-GFS_WAVE_DIR = Path(r"Z:\NOAA\predict_gfs_fala")
-=======
-SWAN_DIR = Path(f"/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_swan")
-NOAA_DIR = Path(f"/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_noaa")
->>>>>>> 93bd6f4 (06.02.2025 server przed uruchomilianiem)
+
+BASE_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA")
+
+SWAN_DIR = BASE_DIR / "predict_swan"
+PREDICT_NOAA_DIR = BASE_DIR / "predict_noaa"
+GFS_DIR = BASE_DIR / "data_gfs"
+GFS_WAVE_DIR = BASE_DIR / "predict_gfs_fala"
+
+
+SWAN_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_swan")
+NOAA_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_noaa")
 
 
 # ----------------------------------------------------------
