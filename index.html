@@ -769,7 +769,7 @@
 
 
     function loadTemperatureGrid(timeIdx = 0) {
-      fetch(`/api/temp_grid?time_idx=${timeIdx}`)
+      fetch(`http://10.0.1.6:8000/api/temp_grid?time_idx=${timeIdx}`)
         .then(r => r.json())
         .then(data => {
           drawTemperatureNumbers(data.points);
@@ -930,7 +930,11 @@
     function sendCoordsToAPI(lat, lon) {
       // Показываем окно графика
       document.getElementById("wind-chart-box").style.display = "block";
-      return fetch(`/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}`)
+<<<<<<< HEAD
+      return fetch(`http://10.0.1.6:8000/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}`)
+=======
+      return fetch(`http://10.10.100.20:8000/api/forecast?lat=${lat}&lon=${lon}`)
+>>>>>>> 93bd6f4 (06.02.2025 server przed uruchomilianiem)
         .then(r => r.json())
         .then(data => {
           console.log("Ответ FastAPI:", data);
@@ -990,6 +994,22 @@
     const totalSteps = days * pointsPerDay;
     let forecast = null;
 
+<<<<<<< HEAD
+=======
+    fetch("http://10.10.100.20:8000/api/forecast")
+      .then(resp => resp.json())
+      .then(data => {
+        forecast = data;
+        document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
+        onTimeChange(0);
+      })
+      .catch(err => {
+        console.error("❌ Błąd ładowania danych:", err);
+        document.getElementById("forecast-panel").innerHTML =
+          "<div id='forecast-title'>⚠️ Nie udało się załadować danych prognozy</div>";
+      });
+
+>>>>>>> 93bd6f4 (06.02.2025 server przed uruchomilianiem)
     /* ================================
       3a) ОБРАБОТЧИК КЛИКА ПО РУЧКЕ
     ================================ */
@@ -1503,7 +1523,7 @@
 
       showLoader();
       try {
-        const url = `/api/forecast_pdf?lat=${lat}&lon=${lon}&model=${currentModel}`;
+        const url = `http://10.0.1.6:8000/api/forecast_pdf?lat=${lat}&lon=${lon}&model=${currentModel}`;
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`PDF error: ${resp.status}`);
 

@@ -11,10 +11,15 @@ import numpy as np
 import xarray as xr
 
 # === НАСТРОЙКИ ===
+<<<<<<< HEAD
 SWAN_DIR = Path(r"Z:\NOAA\predict_swan")
 PREDICT_NOAA_DIR = Path(r"Z:\NOAA\predict_noaa")
 GFS_DIR = Path(r"Z:\NOAA\data_gfs")
 GFS_WAVE_DIR = Path(r"Z:\NOAA\predict_gfs_fala")
+=======
+SWAN_DIR = Path(f"/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_swan")
+NOAA_DIR = Path(f"/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_noaa")
+>>>>>>> 93bd6f4 (06.02.2025 server przed uruchomilianiem)
 
 
 # ----------------------------------------------------------
