@@ -769,7 +769,7 @@
 
 
     function loadTemperatureGrid(timeIdx = 0) {
-      fetch(`http://10.0.1.6:8000/api/temp_grid?time_idx=${timeIdx}`)
+      fetch(`/api/temp_grid?time_idx=${timeIdx}`)
         .then(r => r.json())
         .then(data => {
           drawTemperatureNumbers(data.points);
@@ -930,7 +930,7 @@
     function sendCoordsToAPI(lat, lon) {
       // Показываем окно графика
       document.getElementById("wind-chart-box").style.display = "block";
-      return fetch(`http://10.0.1.6:8000/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}`)
+      return fetch(`/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}`)
         .then(r => r.json())
         .then(data => {
           console.log("Ответ FastAPI:", data);
@@ -1503,7 +1503,7 @@
 
       showLoader();
       try {
-        const url = `http://10.0.1.6:8000/api/forecast_pdf?lat=${lat}&lon=${lon}&model=${currentModel}`;
+        const url = `/api/forecast_pdf?lat=${lat}&lon=${lon}&model=${currentModel}`;
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`PDF error: ${resp.status}`);
 

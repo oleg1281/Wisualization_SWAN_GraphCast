@@ -317,6 +317,8 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
 
         if model == "graphcast":
             rain_mm = [x if x >= 0.2 else 0 for x in rain_mm]
+        elif model == "gfs":
+            rain_mm = [x if x >= 0.15 else 0 for x in rain_mm]
 
         # ветер
         wind_ms = np.sqrt(
