@@ -4,24 +4,28 @@
 вся логика находится внутри функции load_forecast().
 """
 import time
-
 from pathlib import Path
 import re
 import numpy as np
 import xarray as xr
-from pathlib import Path
-# === НАСТРОЙКИ ===
 
+# === НАСТРОЙКИ ===
 BASE_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA")
 
 SWAN_DIR = BASE_DIR / "predict_swan"
 PREDICT_NOAA_DIR = BASE_DIR / "predict_noaa"
+
 GFS_DIR = BASE_DIR / "data_gfs"
 GFS_WAVE_DIR = BASE_DIR / "predict_gfs_fala"
 
+IFS_DIR = BASE_DIR / "predict_ifs"
+IFS_WAVE_DIR = BASE_DIR / "predict_ifs"
 
-SWAN_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_swan")
-NOAA_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_noaa")
+AIFS_DIR = BASE_DIR / "predict_aifs"
+AIFS_WAVE_DIR = BASE_DIR / "predict_ifs"  #----------------------------- нужно будет поменять когда добавлю сван к этой модели ----------------
+
+#SWAN_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_swan")
+#NOAA_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA/predict_noaa")
 
 
 # ----------------------------------------------------------
@@ -67,6 +71,10 @@ def open_dataset_safe(
 def get_noaa_dir(model: str) -> Path:
     if model == "gfs":
         return GFS_DIR
+    elif model == "ifs":
+        return IFS_DIR
+    elif model == "aifs":
+        return AIFS_DIR
     return PREDICT_NOAA_DIR   # graphcast по умолчанию
 
 
@@ -78,10 +86,14 @@ def find_latest_common_pred_file():
 
     swan_files = {f.name for f in SWAN_DIR.glob("pred_NOAA_*.nc")}
     noaa_files = {f.name for f in PREDICT_NOAA_DIR.glob("pred_NOAA_*.nc")}
+
     gfs_files  = {f.name for f in GFS_DIR.glob("pred_NOAA_*.nc")}
     gfsw_files = {f.name for f in GFS_WAVE_DIR.glob("pred_NOAA_*.nc")}
 
-    common = swan_files & noaa_files & gfs_files & gfsw_files
+    ifs_files = {f.name for f in IFS_DIR.glob("pred_NOAA_*.nc")}
+    ifsw_files = {f.name for f in IFS_WAVE_DIR.glob("pred_NOAA_*.nc")}
+
+    common = swan_files & noaa_files & gfs_files & gfsw_files & ifs_files & ifsw_files
 
     if not common:
         raise FileNotFoundError("❌ Нет общего цикла во всех папках")
@@ -272,6 +284,22 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
                 hs_values = point_wave["hs"].values.astype(float)
                 has_wave_data = not np.all(np.isnan(hs_values))
 
+        elif model == "ifs":
+            # === IFS WAVE ===
+            latest_gfs_wave = find_latest_gfs_wave_file(IFS_WAVE_DIR)
+
+            with xr.open_dataset(latest_gfs_wave) as ds_wave:
+
+                lat_w, lon_w = guess_lat_lon_names(ds_wave)
+
+                point_wave = ds_wave.sel(
+                    {lat_w: TARGET_LAT, lon_w: TARGET_LON},
+                    method="nearest"
+                )
+
+                hs_values = point_wave["significant_wave_height"].values.astype(float)
+                has_wave_data = not np.all(np.isnan(hs_values))
+
         else:
             # === SWAN ===
             point_swan = ds_swan_sel.sel(
@@ -284,7 +312,7 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
 
         # формируем waves один раз
         if not has_wave_data:
-            waves = ["—"] * len(common_time)
+            waves = None
         else:
             waves = np.round(hs_values.squeeze(), 2).tolist()
 
@@ -296,7 +324,7 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
         )
 
         wind_ds = ds_noaa_sel[
-            ["10m_u_component_of_wind", "10m_v_component_of_wind", "2m_temperature", "total_precipitation_6hr", ]
+            ["10m_u_component_of_wind", "10m_v_component_of_wind", "2m_temperature", "total_precipitation_6hr"]
         ]
 
         wind_point = wind_ds.interp(
@@ -309,9 +337,20 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
         t2m = point_noaa["2m_temperature"]
         msl = point_noaa["mean_sea_level_pressure"]
         tp6 = wind_point["total_precipitation_6hr"]
-        sh = point_noaa["specific_humidity"]
+        #sh = point_noaa["specific_humidity"]
         u10 = wind_point["10m_u_component_of_wind"]
         v10 = wind_point["10m_v_component_of_wind"]
+        # --- ПОРЫВЫ ВЕТРА ---
+        if "fg10" in point_noaa.data_vars:
+            fg10 = point_noaa["fg10"]
+        else:
+            fg10 = None
+
+        # --- ОБЛАЧНОСТЬ ---
+        if "total_cloud_cover" in point_noaa.data_vars:
+            tcc = point_noaa["total_cloud_cover"]
+        else:
+            tcc = None
 
         # === 9. Приводим всё в удобный формат ===
         times = point_noaa["time"].values
@@ -333,9 +372,9 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
             (v10.values.astype(float).squeeze()) ** 2
         )
 
-        wind_kt = np.round(wind_ms * 1.943844).tolist()
+        wind_kt = np.round(wind_ms * 1.943844, 1).tolist()
 
-        wind_ms = np.round(wind_ms, )
+        wind_ms = np.round(wind_ms, 1)
 
         # направление ветра (откуда дует)
         wind_dir = (
@@ -350,19 +389,62 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
         wind_dir_to = (wind_dir + 180) % 360
         wind_arrow = [deg_to_arrow(d) for d in wind_dir_to]
 
+        # --- порывы ветра (gust) ---
+        if fg10 is not None:
+
+            arr = fg10.values.astype(float).squeeze()
+
+            # если fg10 = NaN → берем wind_ms * 1.5
+            gust_base = np.where(
+                np.isnan(arr),
+                wind_ms * 1.5,
+                arr
+            )
+
+        else:
+            # если fg10 вообще отсутствует
+            gust_base = wind_ms * 1.5
+
+        # итоговые массивы
+        wind_porywy_ms = np.round(gust_base, 1).tolist()
+        wind_porywy_kt = np.round(gust_base * 1.943844, 1).tolist()
+
+        if tcc is None:
+            total_cloud_cover = ["-"] * len(time_str)  # или len(common_time)
+        else:
+            total_cloud_cover = (tcc.values.squeeze() * 100).round().astype(int).tolist()
+
         end = time.perf_counter()
         print(f"Время выполнения load_forecast: {end - start:.3f} сек")
 
         # === 10. Возвращаем JSON ===
-        return {
-            "time": time_str,
-            "waves": waves,
-            "wind_kt": wind_kt,
-            "wind_ms": wind_ms.tolist(),
-            "temp": temp_C,
-            "rain": rain_mm,
-            "pressure": pressure_hpa,
-            "wind_arrow": wind_arrow,   # ←
-        }
+        if waves == None:
+            return {
+                "time": time_str,
+                #"waves": waves,
+                "wind_kt": wind_kt,
+                "wind_ms": wind_ms.tolist(),
+                "wind_porywy_kt": wind_porywy_kt,
+                "wind_porywy_ms": wind_porywy_ms,
+                "temp": temp_C,
+                "rain": rain_mm,
+                "pressure": pressure_hpa,
+                "wind_arrow": wind_arrow,   # ←
+                "total_cloud_cover": total_cloud_cover
+            }
+        else:
+            return {
+                "time": time_str,
+                "waves": waves,
+                "wind_kt": wind_kt,
+                "wind_ms": wind_ms.tolist(),
+                "wind_porywy_kt": wind_porywy_kt,
+                "wind_porywy_ms": wind_porywy_ms,
+                "temp": temp_C,
+                "rain": rain_mm,
+                "pressure": pressure_hpa,
+                "wind_arrow": wind_arrow,  # ←
+                "total_cloud_cover": total_cloud_cover
+            }
 
 

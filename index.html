@@ -692,7 +692,7 @@
 
   <script>
     let marker = null;
-    let currentModel = "graphcast";
+    let currentModel = "ifs";
     
     /* =======================
       1) КАРТА
@@ -769,7 +769,7 @@
 
 
     function loadTemperatureGrid(timeIdx = 0) {
-      fetch(`http://10.0.1.6:8000/api/temp_grid?time_idx=${timeIdx}`)
+      fetch(`/api/temp_grid?time_idx=${timeIdx}`)
         .then(r => r.json())
         .then(data => {
           drawTemperatureNumbers(data.points);
@@ -806,9 +806,9 @@
       sendCoordsToAPI(lat, lon).finally(() => hideLoader());
     });
 
-    map.on("zoomend", () => {
+    /*map.on("zoomend", () => {
       loadTemperatureGrid(currentStep);
-    });
+    });*/
 
     // --- БАЗОВЫЕ КАРТЫ ---
     const openTopoMap = L.tileLayer(
@@ -930,11 +930,7 @@
     function sendCoordsToAPI(lat, lon) {
       // Показываем окно графика
       document.getElementById("wind-chart-box").style.display = "block";
-<<<<<<< HEAD
-      return fetch(`http://10.0.1.6:8000/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}`)
-=======
-      return fetch(`http://10.10.100.20:8000/api/forecast?lat=${lat}&lon=${lon}`)
->>>>>>> 93bd6f4 (06.02.2025 server przed uruchomilianiem)
+      return fetch(`/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}`)
         .then(r => r.json())
         .then(data => {
           console.log("Ответ FastAPI:", data);
@@ -994,22 +990,6 @@
     const totalSteps = days * pointsPerDay;
     let forecast = null;
 
-<<<<<<< HEAD
-=======
-    fetch("http://10.10.100.20:8000/api/forecast")
-      .then(resp => resp.json())
-      .then(data => {
-        forecast = data;
-        document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
-        onTimeChange(0);
-      })
-      .catch(err => {
-        console.error("❌ Błąd ładowania danych:", err);
-        document.getElementById("forecast-panel").innerHTML =
-          "<div id='forecast-title'>⚠️ Nie udało się załadować danych prognozy</div>";
-      });
-
->>>>>>> 93bd6f4 (06.02.2025 server przed uruchomilianiem)
     /* ================================
       3a) ОБРАБОТЧИК КЛИКА ПО РУЧКЕ
     ================================ */
@@ -1023,8 +1003,21 @@
     });
 
     function buildForecastPanel() {
-      if (!forecast) return "";
-      const { time, waves, wind_kt, wind_ms, wind_arrow, temp, rain, pressure } = forecast;
+  if (!forecast) return "";
+
+  const {
+    time = [],
+    waves = null,
+    wind_kt = null,
+    wind_ms = null,
+    wind_arrow = [],
+    temp = null,
+    rain = null,
+    pressure = null,
+    wind_porywy_ms = null,
+    wind_porywy_kt = null,
+    total_cloud_cover = null
+  } = forecast;
 
       // === Группировка по дням ===
       const dayGroups = [];
@@ -1103,7 +1096,21 @@
             `).join("")}
           </tr>
           <tr><td></td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}<td style="min-width:20px;"></td></tr>
-          <tr class="waves"><td>🌊 Fale (m)</td>${forecast.waves.map(w =>`<td class="${waveClass(w)}">${w}</td>`).join("")}</tr>
+          
+          ${waves && waves.length ? `
+          <tr class="waves">
+            <td>🌊 Fale (m)</td>
+            ${waves.map(w => `<td class="${waveClass(w)}">${w}</td>`).join("")}
+          </tr>` : ""}
+          
+          <tr class="wind">
+            <td>💨 Porywy ${useKt ? "(kt)" : "(m/s)"}</td>
+            ${(useKt ? wind_porywy_kt : wind_porywy_ms)
+              .map(v => `
+                <td class="${gustClass(v)}">${v ?? "-"}</td>
+              `)
+              .join("")}
+          </tr>
           
           <tr class="wind">
             <td>💨 Wiatr ${useKt ? "(kt)" : "(m/s)"}</td>
@@ -1121,7 +1128,12 @@
 
           <tr class="temp"><td>🌡 Temp (°C)</td>${temp.map(v=>`<td>${v}</td>`).join("")}</tr>
           <tr class="rain"><td>🌧 Opady (mm)</td>${rain.map(v=>`<td>${v}</td>`).join("")}</tr>
-          
+          <tr class="cloud">
+            <td>☁ Zachmurzenie (%)</td>
+            ${total_cloud_cover.map(v => `
+              <td class="${cloudClass(v)}">${v ?? "-"}</td>
+            `).join("")}
+          </tr>
           <tr class="pressure"><td>🔽 Ciśnienie (hPa)</td>${pressure.map(v=>`<td>${v}</td>`).join("")}</tr>
         </table>`;
     }
@@ -1185,59 +1197,62 @@
     let tempChart = null;
 
     function updatewindWaveChart(windValues, waveValues, times) {
+
+      if (!windValues || !times) return;
+
       const box = document.getElementById("wind-chart-box");
       box.style.display = "flex";
 
-      // Используем первые 20 пунктов (5 дней)
       const wind5 = windValues.slice(0, 18);
-      const wave5 = waveValues.slice(0, 18);
       const time5 = times.slice(0, 18);
 
-      if (!wind5 || wind5.length === 0) {
-        box.innerHTML = "<p style='color:white'>Brak danych</p>";
-        return;
-      }
+      const wave5 = waveValues && waveValues.length
+        ? waveValues.slice(0, 18)
+        : null;
 
       const ctx = document.getElementById("windWaveChart").getContext("2d");
 
       if (windWaveChart) windWaveChart.destroy();
 
-      // Даты на X
       const labels = time5.map(t => {
         const d = new Date(t);
         return d.toLocaleString("pl", {
           day: "2-digit",
           month: "short",
-          hour: "2-digit",
-          minute: "2-digit"
+          hour: "2-digit"
         });
       });
 
-      // графики
+      // ✅ DATASETS СОЗДАЁМ ДО Chart
+      const datasets = [
+        {
+          label: useKt ? "Wiatr (kt)" : "Wiatr (m/s)",
+          data: wind5,
+          borderColor: "rgba(255, 210, 0, 0.9)",
+          backgroundColor: "rgba(255, 210, 0, 0.25)",
+          borderWidth: 2,
+          tension: 0.35,
+          yAxisID: "y1"
+        }
+      ];
+
+      if (wave5) {
+        datasets.push({
+          label: "Fale (m)",
+          data: wave5,
+          borderColor: "rgba(0, 200, 255, 0.85)",
+          backgroundColor: "rgba(0, 200, 255, 0.25)",
+          borderWidth: 2,
+          tension: 0.35,
+          yAxisID: "y2"
+        });
+      }
+
       windWaveChart = new Chart(ctx, {
         type: "line",
         data: {
           labels: labels,
-          datasets: [
-            {
-              label: useKt ? "Wiatr (kt)" : "Wiatr (m/s)",
-              data: wind5,
-              borderColor: "rgba(255, 210, 0, 0.9)",
-              backgroundColor: "rgba(255, 210, 0, 0.25)",
-              borderWidth: 2,
-              tension: 0.35,
-              yAxisID: "y1"
-            },
-            {
-              label: "Fale (m)",
-              data: wave5,
-              borderColor: "rgba(0, 200, 255, 0.85)",
-              backgroundColor: "rgba(0, 200, 255, 0.25)",
-              borderWidth: 2,
-              tension: 0.35,
-              yAxisID: "y2"
-            }
-          ]
+          datasets: datasets
         },
         options: {
           plugins: {
@@ -1247,72 +1262,63 @@
           maintainAspectRatio: false,
           scales: {
             x: {
-              offset: false,              // 🔥 КЛЮЧЕВОЕ
-              bounds: "ticks",            // 🔥
+              display: true,
               ticks: {
-                source: "labels",         // 🔥
                 display: false,
-                font: {
-                  size: 11,                // ← ТАКОЙ ЖЕ, КАК У ТЕМПЕРАТУРЫ
-                  weight: "bold"
-                }
+                autoSkip: false,     // чтобы линии были на каждый label (как “частые”)
+                maxRotation: 0,
+                minRotation: 0
               },
               grid: {
                 display: true,
-                color: "rgba(255,255,255,0.1)",
+                drawOnChartArea: true,
+                color: "rgba(255,255,255,0.1)",   // ✅ как в температуре
                 lineWidth: 1
-              }
+              },
+              border: { display: false }
             },
-
-            // 🟡 ВЕТЕР
             y1: {
               position: "left",
               min: 0,
               max: useKt ? 40 : 20,
               ticks: {
                 stepSize: useKt ? 5 : 2.5,
-                color: "#ffd200",
-
-                // 🔥 ФИКС ШИРИНЫ
-                callback: (value) => {
-                  const v = Math.round(value).toString();
-                  return v.padStart(3, " ");
-                }
-              },
-              grid: {
-                color: "rgba(255, 210, 0, 0.25)"   // мягкая жёлтая сетка
+                color: "#ffd200"
               },
               title: {
                 display: true,
                 text: useKt ? "Wiatr (kt)" : "Wiatr (m/s)",
-                color: "#ffd200",         // ← ЖЁЛТЫЙ
+                color: "#ffd200",
                 font: { size: 11, weight: "bold" }
-              }
-            },
-
-            // 🔵 ВОЛНЫ
-            y2: {
-              position: "right",
-              min: 0,                 // оставляем 0
-              ticks: {
-                color: "#00c8ff",
-                padding: 4
               },
               grid: {
-                drawOnChartArea: false
-              },
-              title: {
-                display: true,
-                text: "Fale (m)",
-                color: "#00c8ff",
-                font: { size: 11, weight: "bold" }
+                color: "rgba(255,210,0,0.25)"
               }
-            }
+            },
+            ...(wave5 ? {
+              y2: {
+                position: "right",
+                min: 0,
+                ticks: {
+                  color: "#00c8ff"
+                },
+                grid: {
+                  drawOnChartArea: false
+                },
+                title: {
+                  display: true,
+                  text: "Fale (m)",
+                  color: "#00c8ff",
+                  font: { size: 11, weight: "bold" }
+                }
+              }
+            } : {})
           }
-
-
         }
       });
+
+      document.querySelector(".legend-item.wind").textContent =
+        useKt ? "Wiatr (kt)" : "Wiatr (m/s)";
     }
 
     // =======================
@@ -1325,7 +1331,7 @@
       initStartPoint(START_LAT, START_LON);
     });
 
-    loadTemperatureGrid(0);
+    // loadTemperatureGrid(0);
   </script>
 
   <script>
@@ -1487,25 +1493,35 @@
 
   <script>
     const modelBtn = document.getElementById("model-toggle");
-    // ✅ инициализация состояния кнопки
-    if (currentModel === "gfs") {
-      modelBtn.classList.add("active");
-      modelBtn.textContent = "🌐 Model GFS";
-    } else {
-      modelBtn.classList.remove("active");
-      modelBtn.textContent = "🧠 Model MEWO";
-    }
 
-    modelBtn.onclick = () => {
-      currentModel = currentModel === "graphcast" ? "gfs" : "graphcast";
+    const models = ["gfs", "graphcast", "ifs"];
+    let modelIndex = models.indexOf(currentModel);
 
+    function updateModelButton() {
       if (currentModel === "gfs") {
         modelBtn.classList.add("active");
         modelBtn.textContent = "🌐 Model GFS";
-      } else {
+      } 
+      else if (currentModel === "graphcast") {
         modelBtn.classList.remove("active");
         modelBtn.textContent = "🧠 Model MEWO";
+      } 
+      else if (currentModel === "ifs") {
+        modelBtn.classList.add("active");
+        modelBtn.textContent = "🌍 Model ECMWF IFS";
       }
+    }
+
+    // инициализация
+    updateModelButton();
+
+    modelBtn.onclick = () => {
+
+      // следующий индекс
+      modelIndex = (modelIndex + 1) % models.length;
+      currentModel = models[modelIndex];
+
+      updateModelButton();
 
       const lat = marker ? marker.getLatLng().lat : START_LAT;
       const lon = marker ? marker.getLatLng().lng : START_LON;
@@ -1523,7 +1539,7 @@
 
       showLoader();
       try {
-        const url = `http://10.0.1.6:8000/api/forecast_pdf?lat=${lat}&lon=${lon}&model=${currentModel}`;
+        const url = `/api/forecast_pdf?lat=${lat}&lon=${lon}&model=${currentModel}`;
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`PDF error: ${resp.status}`);
 
@@ -1700,6 +1716,30 @@
         if (value >= 9.0) return "cell-warn";
         return "cell-go";
       }
+    }
+
+    function gustClass(value) {
+
+      const factor = 1.5;
+
+      if (useKt) {
+        if (value > 19 * factor) return "cell-nogo";
+        if (value > 17 * factor) return "cell-warn";
+        return "cell-go";
+      } else {
+        if (value >= 10.0 * factor) return "cell-nogo";
+        if (value >= 9.0 * factor) return "cell-warn";
+        return "cell-go";
+      }
+    }
+  </script>
+  <script>
+    function cloudClass(value) {
+      if (value == null) return "";
+
+      if (value >= 80) return "cell-nogo";   // плотная облачность
+      if (value >= 40) return "cell-warn";   // средняя
+      return "cell-go";                      // малооблачно
     }
   </script>
   

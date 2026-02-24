@@ -29,6 +29,14 @@ from pathlib import Path
 
 from fastapi.staticfiles import StaticFiles
 
+import logging
+# --- Настройка логирования ---
+logging.basicConfig(
+    filename="access_log.txt",
+    level=logging.INFO,
+    format="%(asctime)s | %(message)s"
+)
+import time
 
 app = FastAPI()
 
@@ -44,6 +52,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+
+# add loging
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+
+    start_time = time.perf_counter()
+
+    # если nginx / proxy — берем реальный IP
+    client_ip = request.headers.get("x-forwarded-for", request.client.host)
+    user_agent = request.headers.get("user-agent", "unknown")
+    path = request.url.path
+    query = str(request.query_params)
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception as e:
+        status_code = 500
+        logging.exception("❌ ERROR during request")
+        raise e
+
+    duration = time.perf_counter() - start_time
+
+    log_line = (
+        f"IP={client_ip} | "
+        f"STATUS={status_code} | "
+        f"PATH={path} | "
+        f"QUERY={query} | "
+        f"TIME={duration:.3f}s | "
+        f"UA={user_agent}"
+    )
+
+    logging.info(log_line)
+
+    return response
+
 
 def normalize_lon_0360(lon):
     return lon % 360

@@ -2,3 +2,8 @@
 и запустить conda activate Wisualization и потом python -m http.server 8080
 
 запуск сервера fast api      uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+sudo nano /etc/systemd/system/wizualization_prognozy.service
+systemctl status wizualization_prognozy
+sudo systemctl restart wizualization_prognozy
+sudo journalctl -u wizualization_prognozy -f
