@@ -1,4 +1,4 @@
 .idea/
 __pycache__/
 *.pyc
- access_log.txt
+access_log.txt
