@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
+from forecast import load_forecast_all_models
+
 from io import BytesIO
 from datetime import datetime
 
@@ -142,18 +144,18 @@ def get_temp_grid(time_idx: int = 0):
 
 
 @app.get("/api/forecast_pdf")
-def forecast_pdf(
-    lat: float = 54.3,
-    lon: float = 18.6,
-    model: str = "graphcast"
-):
-    forecast = load_forecast(
-        TARGET_LAT=round(lat, 4),
-        TARGET_LON=round(lon, 4),
-        model=model
+def forecast_pdf(lat: float = 54.2724, lon: float = 18.5861):
+
+    lat = round(lat, 4)
+    lon = round(lon, 4)
+
+    forecast = load_forecast_all_models(
+        TARGET_LAT=lat,
+        TARGET_LON=lon,
     )
 
     pdf_bytes = build_forecast_pdf(forecast, lat, lon)
+
     filename = f"prognoza_{lat:.4f}_{lon:.4f}.pdf"
 
     return Response(

@@ -198,7 +198,7 @@ def deg_to_arrow(deg):
 # ----------------------------------------------------------
 #  ГЛАВНАЯ ФУНКЦИЯ —
 # ----------------------------------------------------------
-def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
+def load_forecast(TARGET_LAT=54.2724, TARGET_LON=18.5861, model: str = "graphcast"):
     """
     Основная функция — возвращает JSON прогноз.
     Здесь полностью используется ТВОЙ код, только обёрнут.
@@ -359,12 +359,12 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
         temp_C = np.round((t2m.values.astype(float).squeeze() - 273.15), 1).tolist()
         pressure_hpa = np.round((msl.values.astype(float).squeeze() / 100.0), 1).tolist()
         scale = 10 if model == "gfs" else 1
-        rain_mm = np.round((tp6.values.astype(float).squeeze() * 1000.0 * scale), 2).tolist()
+        rain_mm = np.round((tp6.values.astype(float).squeeze() * 1000.0 * scale), 2).tolist() # zmenilem z 1000 na 3600
 
         if model == "graphcast":
             rain_mm = [x if x >= 0.2 else 0 for x in rain_mm]
         elif model == "gfs":
-            rain_mm = [x if x >= 0.15 else 0 for x in rain_mm]
+            rain_mm = [x if x >= 0.01 else 0 for x in rain_mm]
 
         # ветер
         wind_ms = np.sqrt(
@@ -447,4 +447,47 @@ def load_forecast(TARGET_LAT=54.3, TARGET_LON=18.6, model: str = "graphcast"):
                 "total_cloud_cover": total_cloud_cover
             }
 
+def load_forecast_all_models(TARGET_LAT=54.3, TARGET_LON=18.6):
 
+    print("Loading GraphCast...")
+    gc = load_forecast(TARGET_LAT, TARGET_LON, model="graphcast")
+
+    print("Loading GFS...")
+    gfs = load_forecast(TARGET_LAT, TARGET_LON, model="gfs")
+
+    print("Loading IFS...")
+    ifs = load_forecast(TARGET_LAT, TARGET_LON, model="ifs")
+
+    return {
+        "time": gc.get("time"),
+
+        # TEMPERATURE
+        "temp_gc": gc.get("temp"),
+        "temp_gfs": gfs.get("temp"),
+        "temp_ifs": ifs.get("temp"),
+
+        # WIND
+        "wind_gc": gc.get("wind_ms"),
+        "wind_gfs": gfs.get("wind_ms"),
+        "wind_ifs": ifs.get("wind_ms"),
+
+        # GUST
+        "gust_gc": gc.get("wind_porywy_ms"),
+        "gust_gfs": gfs.get("wind_porywy_ms"),
+        "gust_ifs": ifs.get("wind_porywy_ms"),
+
+        # WAVES
+        "wave_gc": gc.get("waves"),
+        "wave_gfs": gfs.get("waves"),
+        "wave_ifs": ifs.get("waves"),
+
+        # CLOUDS
+        "cloud_gc": gc.get("total_cloud_cover"),
+        "cloud_gfs": gfs.get("total_cloud_cover"),
+        "cloud_ifs": ifs.get("total_cloud_cover"),
+
+        # PRESSURE
+        "pressure_gc": gc.get("pressure"),
+        "pressure_gfs": gfs.get("pressure"),
+        "pressure_ifs": ifs.get("pressure"),
+    }

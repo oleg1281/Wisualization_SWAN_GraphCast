@@ -2,6 +2,8 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#04141f" />
   <title>🌊 Prognoza pogody, fal i wiatru — Morze Bałtyckie</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -33,8 +35,9 @@
 
       color: #dffaff;
       overflow-x: auto;
+      overflow-y: auto;   /* 🔥 ДОБАВИТЬ */
       white-space: nowrap;
-      padding: 10px 14px;
+      padding: 10px 14px calc(16px + env(safe-area-inset-bottom));
       z-index: 9999;
       text-align: center;
 
@@ -43,12 +46,18 @@
       transition: transform 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
 
       /* фиксированная максимальная высота (важно для плавности!) */
-      max-height: 260px;
+      max-height: 280px;
     }
 
     /* === Когда закрыто — увезти вниз на 60% === */
   #forecast-panel.closed {
-    transform: translateY(45%);
+    transform: translateY(calc(100% - 70px));
+  }
+
+  #forecast-panel::after {
+    content: "";
+    display: block;
+    height: 10px;
   }
 
     /* --- Ручка панели --- */
@@ -128,12 +137,12 @@
     #time-controls {
       position: absolute;
       bottom: 260px;
-      left: 1px;
+      left: 10px;
       display: none;
       align-items: center;
       justify-content: flex-start;
-      width: 420px;
-      height: 28px;
+      width: min(420px, calc(100vw - 20px));
+      height: 36px;
       background: rgba(0,40,60,0.3);
       border: 1px solid #00bcd466;
       border-radius: 10px;
@@ -262,14 +271,12 @@
       -webkit-backdrop-filter: blur(6px);
       border: 1px solid rgba(255,255,255,0.2);
 
-      /* 🔥 новые размеры */
-      width: 400px;   /* было 260px */
-      min-height: 320px;  /* было 160px */
+      width: 400px;
+      min-height: 320px;
 
       display: none;
       z-index: 999999;
 
-      display: flex;
       flex-direction: column;
       gap: 6px;
     }
@@ -640,6 +647,210 @@
     }
   </style>
 
+  <style>
+    /* =========================
+       MOBILE / TABLET ADAPTIVE
+    ========================= */
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    button {
+      min-height: 44px; /* удобно для пальца */
+      touch-action: manipulation;
+    }
+
+    #forecast-panel {
+      border-top-left-radius: 18px;
+      border-top-right-radius: 18px;
+      box-shadow:
+        0 -18px 36px rgba(0,0,0,0.38),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    /* на телефоне лучше сильнее прятать */
+    #forecast-panel.closed {
+      transform: translateY(45%);
+    }
+
+    /* график по умолчанию скрыт */
+    #wind-chart-box {
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      #wind-chart-box {
+        width: min(360px, calc(100vw - 20px));
+        min-height: 250px;
+      }
+
+      .chart-top {
+        height: 105px;
+      }
+
+      .chart-bottom {
+        height: 120px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      #ui-overlay {
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        left: 10px;
+        right: 10px;
+        bottom: auto;
+
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      #ui-overlay button {
+        width: 100%;
+        font-size: 11px;
+        padding: 8px 10px;
+        border-radius: 12px;
+      }
+
+      #wind-chart-box {
+        top: calc(env(safe-area-inset-top, 0px) + 118px);
+        left: 10px;
+        right: 10px;
+        width: auto;
+        min-height: 220px;
+        padding: 8px;
+        border-radius: 14px;
+      }
+
+      #charts-legend {
+        gap: 10px;
+        font-size: 10px;
+        flex-wrap: wrap;
+      }
+
+      #time-controls {
+        left: 10px;
+        right: 10px;
+        width: auto;
+        bottom: 180px;
+        height: 40px;
+        padding: 6px 10px;
+        border-radius: 12px;
+      }
+
+      #play-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+        margin-right: 8px;
+      }
+
+      #time-label {
+        min-width: 76px;
+        font-size: 10px;
+      }
+
+      #forecast-panel {
+        padding: 8px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+        max-height: 38vh;
+      }
+
+      #forecast-title {
+        font-size: 13px;
+      }
+
+      #forecast-panel table {
+        font-size: 11px;
+      }
+
+      #forecast-panel td {
+        padding: 4px 4px;
+      }
+
+      .day-header {
+        font-size: 11px;
+        padding: 4px 4px;
+      }
+
+      .temp-number {
+        font-size: 9px;
+        padding: 2px 5px;
+      }
+
+      #license-content {
+        width: calc(100vw - 20px);
+        max-width: calc(100vw - 20px);
+        max-height: 85vh;
+        padding: 16px;
+        font-size: 12px;
+        border-radius: 14px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      #ui-overlay {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+
+      #ui-overlay button {
+        font-size: 10px;
+        padding: 8px 8px;
+      }
+
+      #wind-chart-box {
+        top: calc(env(safe-area-inset-top, 0px) + 108px);
+        min-height: 190px;
+      }
+
+      .chart-top {
+        height: 78px;
+      }
+
+      .chart-bottom {
+        height: 86px;
+      }
+
+      #forecast-panel {
+        max-height: 34vh;
+      }
+
+      #forecast-panel.closed {
+        transform: translateY(74%);
+      }
+
+      #forecast-panel table {
+        font-size: 10px;
+      }
+
+      #forecast-panel td {
+        padding: 3px 3px;
+      }
+
+      .day-header {
+        font-size: 10px;
+      }
+
+      #time-controls {
+        bottom: 150px;
+        height: 38px;
+      }
+
+      /* второстепенные строки можно скрыть на совсем маленьком экране */
+      #forecast-table .rain,
+      #forecast-table .cloud,
+      #forecast-table .pressure {
+        display: none;
+      }
+    }
+  </style>
+
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -693,6 +904,20 @@
   <script>
     let marker = null;
     let currentModel = "ifs";
+
+    // 👇 ВСТАВИТЬ СЮДА
+    function getAttributionText() {
+      if (currentModel === "ifs") {
+        return "Based on ECMWF data © ECMWF";
+      }
+      if (currentModel === "gfs") {
+        return "NOAA GFS data (Public Domain)";
+      }
+      if (currentModel === "graphcast") {
+        return "Based on ECMWF data © ECMWF + SWAN model";
+      }
+      return "";
+    }
     
     /* =======================
       1) КАРТА
@@ -1135,7 +1360,17 @@
             `).join("")}
           </tr>
           <tr class="pressure"><td>🔽 Ciśnienie (hPa)</td>${pressure.map(v=>`<td>${v}</td>`).join("")}</tr>
-        </table>`;
+        </table>
+
+        <div style="
+          margin-top:6px;
+          font-size:11px;
+          color:#9fdfff;
+          opacity:0.85;
+        ">
+          ${getAttributionText()}
+        </div>
+        `;
     }
 
     function highlightTime(step) {
@@ -1324,8 +1559,8 @@
     // =======================
     // 🚀 АВТОСТАРТ — ГДАНЬСК
     // =======================
-    const START_LAT = 54.3520;
-    const START_LON = 18.6466;
+    const START_LAT = 54.2684;
+    const START_LON = 18.5875;
 
     map.whenReady(() => {
       initStartPoint(START_LAT, START_LON);
@@ -1500,11 +1735,11 @@
     function updateModelButton() {
       if (currentModel === "gfs") {
         modelBtn.classList.add("active");
-        modelBtn.textContent = "🌐 Model GFS";
+        modelBtn.textContent = "🌐 Model NOAA GFS";
       } 
       else if (currentModel === "graphcast") {
         modelBtn.classList.remove("active");
-        modelBtn.textContent = "🧠 Model MEWO";
+        modelBtn.textContent = "🧠 Model ECMWF IFS + SWAN";
       } 
       else if (currentModel === "ifs") {
         modelBtn.classList.add("active");
@@ -1576,6 +1811,29 @@
         Zakres licencji zależy od wybranego źródła prognozy.
       </p>
 
+      <h3>🌍 ECMWF IFS — Integrated Forecasting System</h3>
+      <p><strong>This service is based on data and products of the European Centre for Medium-Range Weather Forecasts (ECMWF).</strong></p>
+      <p>
+        Prognozy meteorologiczne ECMWF IFS (Integrated Forecasting System)
+        udostępniane są w ramach programu <strong>ECMWF Open Data</strong>.
+
+        Dane te są dostępne na licencji
+        <strong>Creative Commons CC BY 4.0</strong>, co oznacza że mogą być
+        używane, przetwarzane oraz rozpowszechniane również
+        w celach komercyjnych, pod warunkiem podania źródła danych.
+
+        Źródło danych:
+        <strong>European Centre for Medium-Range Weather Forecasts (ECMWF)</strong>.
+
+        <br><br>
+        <a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank">
+        https://www.ecmwf.int/en/forecasts/datasets/open-data
+        </a>
+      </p>
+      <p style="font-size:0.85em; opacity:0.8;">
+      ECMWF does not accept any liability whatsoever for any error or omission in the data, or for any loss or damage arising from their use.
+      </p>
+
       <h3>🌐 NOAA / NWS</h3>
       <p>
         Dane meteorologiczne NOAA (National Oceanic and Atmospheric Administration)
@@ -1595,20 +1853,6 @@
         stosowane również w celach komercyjnych, bez konieczności uzyskiwania licencji.<br>
         <a href="https://www.noaa.gov/disclaimer" target="_blank">
           https://www.noaa.gov/disclaimer
-        </a>
-      </p>
-
-      <h3>🧠 GraphCast — DeepMind / Google</h3>
-      <p>
-        Model prognostyczny GraphCast oraz jego wagi są objęte licencją
-        <strong>Creative Commons CC BY-NC 4.0</strong> (bez użycia komercyjnego).<br>
-        Prognozy oparte na modelu GraphCast są wykorzystywane
-        <strong>wyłącznie do wewnętrznych celów analitycznych, badawczych
-        i wspomagania decyzji</strong> w ramach działalności firmy.
-        Dane te nie są sprzedawane ani udostępniane publicznie.<br>
-        © DeepMind / Google Research<br>
-        <a href="https://github.com/google-deepmind/graphcast" target="_blank">
-          https://github.com/google-deepmind/graphcast
         </a>
       </p>
 
