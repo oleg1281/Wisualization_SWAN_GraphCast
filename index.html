@@ -521,29 +521,6 @@
   </style>
 
   <style>
-    /* значения температур на карте */
-    .temp-number {
-      font-size: 10px;
-      font-weight: 600;
-      color: #ffffff;
-
-      background: rgba(0, 0, 0, 0.45);   /* ← ключевое */
-      padding: 2px 6px;
-      border-radius: 6px;
-
-      box-shadow:
-        0 0 4px rgba(0,0,0,0.6),
-        0 0 10px rgba(0,0,0,0.4);
-
-      text-shadow:
-        0 0 3px rgba(0,0,0,0.9);
-
-      pointer-events: none;
-      white-space: nowrap;
-    }
-  </style>
-
-  <style>
     /* === Заголовок дня прогноза === */
     .day-header {
       background: linear-gradient(
@@ -778,11 +755,6 @@
         padding: 4px 4px;
       }
 
-      .temp-number {
-        font-size: 9px;
-        padding: 2px 5px;
-      }
-
       #license-content {
         width: calc(100vw - 20px);
         max-width: calc(100vw - 20px);
@@ -913,7 +885,7 @@
       if (currentModel === "gfs") {
         return "NOAA GFS data (Public Domain)";
       }
-      if (currentModel === "graphcast") {
+      if (currentModel === "ifs_swan") {
         return "Based on ECMWF data © ECMWF + SWAN model";
       }
       return "";
@@ -933,10 +905,6 @@
     map.getPane("labels").style.zIndex = 650;
     map.getPane("labels").style.pointerEvents = "none";
 
-    map.createPane("tempPane");
-    map.getPane("tempPane").style.zIndex = 640;
-    map.getPane("tempPane").style.pointerEvents = "none";
-
     // =======================
     // 🔷 ПОЛИГОНЫ (GeoJSON)
     // =======================
@@ -952,55 +920,6 @@
           }
         }).addTo(map);
       });
-
-    // =======================
-    // TEMPERATURE NUMBERS LAYER
-    // =======================
-    const tempNumbersLayer = L.layerGroup().addTo(map);
-    
-
-    function drawTemperatureNumbers(points) {
-      tempNumbersLayer.clearLayers();
-      const zoom = map.getZoom();
-
-      let step = 1;
-      if (zoom <= 5) step = 8;
-      else if (zoom <= 6) step = 4;
-      else if (zoom <= 7) step = 2;
-      else if (zoom <= 8) step = 1;
-
-      points.forEach(p => {
-        if (
-          Math.abs(p.lat) % step !== 0 ||
-          Math.abs(p.lon) % step !== 0
-        ) return;
-
-        const icon = L.divIcon({
-          className: "temp-number",
-          html: `<div>${p.temp}°C</div>`,
-          iconSize: [28, 16],
-          iconAnchor: [14, 8]
-        });
-
-        L.marker([p.lat, p.lon], {
-          icon,
-          pane: "tempPane"   // ← ВАЖНО
-        }).addTo(tempNumbersLayer);
-
-      });
-
-      updateTempScale();
-    }
-
-
-    function loadTemperatureGrid(timeIdx = 0) {
-      fetch(`/api/temp_grid?time_idx=${timeIdx}`)
-        .then(r => r.json())
-        .then(data => {
-          drawTemperatureNumbers(data.points);
-        })
-        .catch(err => console.error("Temp grid error:", err));
-    }
 
     map.on("click", function (e) {
       const lat = e.latlng.lat;
@@ -1030,10 +949,6 @@
       // Отправляем координаты в FastAPI
       sendCoordsToAPI(lat, lon).finally(() => hideLoader());
     });
-
-    /*map.on("zoomend", () => {
-      loadTemperatureGrid(currentStep);
-    });*/
 
     // --- БАЗОВЫЕ КАРТЫ ---
     const openTopoMap = L.tileLayer(
@@ -1214,6 +1129,11 @@
     const days = 14, hoursStep = 6, pointsPerDay = 24 / hoursStep;
     const totalSteps = days * pointsPerDay;
     let forecast = null;
+    const PL_LOCALE = "pl";
+
+    function formatPlDate(date, options) {
+      return date.toLocaleString(PL_LOCALE, options);
+    }
 
     /* ================================
       3a) ОБРАБОТЧИК КЛИКА ПО РУЧКЕ
@@ -1258,8 +1178,8 @@
         if (!currentDay || currentDay.key !== dayKey) {
           currentDay = {
             key: dayKey,
-            weekday: d.toLocaleString("pl", { weekday: "long" }),
-            dateLabel: `${d.getDate()} ${d.toLocaleString("pl", { month: "short" })}`,
+            weekday: formatPlDate(d, { weekday: "long" }),
+            dateLabel: `${d.getDate()} ${formatPlDate(d, { month: "short" })}`,
             isWeekend: d.getDay() === 0 || d.getDay() === 6,
             count: 1
           };
@@ -1396,7 +1316,7 @@
       const day = Math.floor(step / pointsPerDay);
       const hour = (step % pointsPerDay) * 6;
       const date = new Date(2025, 8, 1 + day, hour);
-      timeLabel.textContent = date.toLocaleString("pl", {
+      timeLabel.textContent = formatPlDate(date, {
         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
       });
     }
@@ -1451,7 +1371,7 @@
 
       const labels = time5.map(t => {
         const d = new Date(t);
-        return d.toLocaleString("pl", {
+        return formatPlDate(d, {
           day: "2-digit",
           month: "short",
           hour: "2-digit"
@@ -1566,7 +1486,6 @@
       initStartPoint(START_LAT, START_LON);
     });
 
-    // loadTemperatureGrid(0);
   </script>
 
   <script>
@@ -1613,7 +1532,7 @@
 
       const labels = time5.map(t => {
         const d = new Date(t);
-        return d.toLocaleString("pl", {
+        return formatPlDate(d, {
           day: "2-digit",
           month: "short",
           hour: "2-digit"
@@ -1710,6 +1629,10 @@
     ];
 
     let currentBaseIndex = 0;
+    let useKt = false;
+    const modelBtn = document.getElementById("model-toggle");
+    const models = ["gfs", "ifs"];
+    let modelIndex = models.indexOf(currentModel);
 
     document.getElementById("map-toggle").onclick = () => {
       const btn = document.getElementById("map-toggle");
@@ -1724,23 +1647,16 @@
       // 🟡 active ТОЛЬКО для Satellite
       btn.classList.toggle("active", !name.includes("Satellite"));
     };
-  </script>
-
-  <script>
-    const modelBtn = document.getElementById("model-toggle");
-
-    const models = ["gfs", "graphcast", "ifs"];
-    let modelIndex = models.indexOf(currentModel);
 
     function updateModelButton() {
       if (currentModel === "gfs") {
         modelBtn.classList.add("active");
         modelBtn.textContent = "🌐 Model NOAA GFS";
-      } 
-      else if (currentModel === "graphcast") {
+      }
+      else if (currentModel === "ifs_swan") {
         modelBtn.classList.remove("active");
         modelBtn.textContent = "🧠 Model ECMWF IFS + SWAN";
-      } 
+      }
       else if (currentModel === "ifs") {
         modelBtn.classList.add("active");
         modelBtn.textContent = "🌍 Model ECMWF IFS";
@@ -1764,9 +1680,7 @@
       showLoader();
       sendCoordsToAPI(lat, lon).finally(() => hideLoader());
     };
-  </script>
 
-  <script>
     document.getElementById("download-pdf").onclick = async () => {
       // координаты: если уже кликали — берём маркер, иначе стартовые
       const lat = (marker ? marker.getLatLng().lat : START_LAT).toFixed(4);
@@ -1921,17 +1835,15 @@
       if (e.target === document.getElementById("license-modal"))
         document.getElementById("license-modal").style.display = "none";
     };
-  </script>
-  <script>
-    let useKt = false;
 
     document.getElementById("wind-toggle").onclick = () => {
       useKt = !useKt;
 
       const btn = document.getElementById("wind-toggle");
       btn.textContent = useKt ? "Wiatr: KT" : "Wiatr: m/s";
-      btn.classList.toggle("active", useKt);   // ← 🔥 ВОТ ЭТО
+      btn.classList.toggle("active", useKt);
 
+      if (!forecast) return;
       document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
       updatewindWaveChart(
         useKt ? forecast.wind_kt : forecast.wind_ms,
@@ -1939,9 +1851,7 @@
         forecast.time
       );
     };
-  </script>
 
-  <script>
     function waveClass(wave) {
       if (wave > 1.5) return "cell-nogo";
       if (wave >= 1.0) return "cell-warn";
@@ -1986,7 +1896,5 @@
       return "cell-go";                      // малооблачно
     }
   </script>
-  
-
 </body>
 </html>

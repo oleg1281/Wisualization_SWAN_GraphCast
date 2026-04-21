@@ -19,7 +19,6 @@ from pdf_report import build_forecast_pdf
 
 from forecast import (
     load_forecast,
-    load_temperature_grid,
     find_latest_common_pred_file,
     SWAN_DIR,
     PREDICT_NOAA_DIR
@@ -104,7 +103,7 @@ def index():
 def get_forecast(
     lat: float = 54.3,
     lon: float = 18.6,
-    model: str = "graphcast"   # ← ВАЖНО
+    model: str = "ifs_swan"   # ← ВАЖНО
 ):
     lat = max(-90.0, min(90.0, lat))
     lat = round(lat, 1)
@@ -118,29 +117,6 @@ def get_forecast(
         model=model            # ← ВАЖНО
     )
     return forecast
-
-
-@app.get("/api/temp_grid")
-def get_temp_grid(time_idx: int = 0):
-
-    # 1️⃣ находим ПОСЛЕДНИЙ ОБЩИЙ ЦИКЛ
-    fname = find_latest_common_pred_file()
-
-    # 2️⃣ путь ТОЛЬКО к NOAA
-    noaa_path = PREDICT_NOAA_DIR / fname
-
-    # 3️⃣ открываем NetCDF ТОЛЬКО ЗДЕСЬ
-    with xr.open_dataset(noaa_path, decode_timedelta=False) as ds_noaa:
-
-        if "2m_temperature" not in ds_noaa.data_vars:
-            raise ValueError(
-                f"NOAA file has no 2m_temperature: {list(ds_noaa.data_vars)}"
-            )
-
-        points = load_temperature_grid(ds_noaa, time_idx=time_idx)
-
-    # 4️⃣ ds_noaa здесь ГАРАНТИРОВАННО закрыт
-    return {"points": points}
 
 
 @app.get("/api/forecast_pdf")

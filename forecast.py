@@ -10,16 +10,16 @@ import numpy as np
 import xarray as xr
 
 # === НАСТРОЙКИ ===
-BASE_DIR = Path("/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA")
+BASE_DIR = Path(r"/mnt/mewo/Postprocesing/Oleh Bedenok/GRAPHCAST/NOAA")
 
 SWAN_DIR = BASE_DIR / "predict_swan"
 PREDICT_NOAA_DIR = BASE_DIR / "predict_noaa"
 
-GFS_DIR = BASE_DIR / "data_gfs"
-GFS_WAVE_DIR = BASE_DIR / "predict_gfs_fala"
+GFS_DIR = BASE_DIR / "data_gfs_3h"
+GFS_WAVE_DIR = BASE_DIR / "predict_gfs_fala_3h"
 
-IFS_DIR = BASE_DIR / "predict_ifs"
-IFS_WAVE_DIR = BASE_DIR / "predict_ifs"
+IFS_DIR = BASE_DIR / "predict_ifs_3h"
+IFS_WAVE_DIR = BASE_DIR / "predict_ifs_3h"
 
 AIFS_DIR = BASE_DIR / "predict_aifs"
 AIFS_WAVE_DIR = BASE_DIR / "predict_ifs"  #----------------------------- нужно будет поменять когда добавлю сван к этой модели ----------------
@@ -68,40 +68,38 @@ def open_dataset_safe(
     raise RuntimeError(f"Failed to open dataset {path}") from last_exc
 
 
-def get_noaa_dir(model: str) -> Path:
-    if model == "gfs":
-        return GFS_DIR
-    elif model == "ifs":
-        return IFS_DIR
-    elif model == "aifs":
-        return AIFS_DIR
-    return PREDICT_NOAA_DIR   # graphcast по умолчанию
-
-
-def find_latest_common_pred_file():
+def find_latest_common_pred_file(model):
     """
-    Возвращает последний pred_NOAA_*.nc,
-    который есть ВО ВСЕХ папках
+    Возвращает последний общий pred_NOAA_*.nc с выбраной модели ветра и волны,
     """
+    if model == "ifs":
+        wiatr_fala = {f.name for f in IFS_DIR.glob("pred_NOAA_*.nc")}
+        f = sorted(wiatr_fala)[-1]
+        wiatr = IFS_DIR / f
+        fala = IFS_WAVE_DIR / f
+        return wiatr, fala
 
-    swan_files = {f.name for f in SWAN_DIR.glob("pred_NOAA_*.nc")}
-    noaa_files = {f.name for f in PREDICT_NOAA_DIR.glob("pred_NOAA_*.nc")}
+    elif model == "gfs":
+        wiatr = {f.name for f in GFS_DIR.glob("pred_NOAA_*.nc")}
+        fala = {f.name for f in GFS_WAVE_DIR.glob("pred_NOAA_*.nc")}
+        if not (fala & wiatr):
+            raise FileNotFoundError("❌ Нет общего цикла во всех папках")
+        f = sorted(fala & wiatr)[-1]
+        wiatr = GFS_DIR / f
+        fala = GFS_WAVE_DIR / f
+        return wiatr, fala
 
-    gfs_files  = {f.name for f in GFS_DIR.glob("pred_NOAA_*.nc")}
-    gfsw_files = {f.name for f in GFS_WAVE_DIR.glob("pred_NOAA_*.nc")}
+    elif model == "ifs_swan":
+        fala = {f.name for f in SWAN_DIR.glob("pred_NOAA_*.nc")}
+        wiatr = {f.name for f in PREDICT_NOAA_DIR.glob("pred_NOAA_*.nc")}
+        if not (fala & wiatr):
+            raise FileNotFoundError("❌ Нет общего цикла во всех папках")
+        f = sorted(fala & wiatr)[-1]
+        wiatr = PREDICT_NOAA_DIR / f
+        fala = SWAN_DIR / f
+        return wiatr, fala
 
-    ifs_files = {f.name for f in IFS_DIR.glob("pred_NOAA_*.nc")}
-    ifsw_files = {f.name for f in IFS_WAVE_DIR.glob("pred_NOAA_*.nc")}
-
-    common = swan_files & noaa_files & gfs_files & gfsw_files & ifs_files & ifsw_files
-
-    if not common:
-        raise FileNotFoundError("❌ Нет общего цикла во всех папках")
-
-    # сортировка по имени → самый новый в конце
-    latest_name = sorted(common)[-1]
-
-    return latest_name
+    return f"{model} Такая модель не найдена! "
 
 
 def find_latest_gfs_wave_file(folder: Path) -> Path:
@@ -128,68 +126,6 @@ def parse_end_time_from_name(filename: str) -> np.datetime64:
 
     end_date, end_H, end_M = m.group(4), m.group(5), m.group(6)
     return np.datetime64(f"{end_date}T{end_H}:{end_M}:00")
-
-
-def guess_lat_lon_names(ds: xr.Dataset):
-    """Находит названия координат LAT/LON в разных форматах."""
-    for lat in ["lat", "latitude", "y"]:
-        if lat in ds.coords:
-            break
-    else:
-        raise KeyError("Нет координаты LAT")
-
-    for lon in ["lon", "longitude", "x"]:
-        if lon in ds.coords:
-            break
-    else:
-        raise KeyError("Нет координаты LON")
-
-    return lat, lon
-
-
-def load_temperature_grid(ds_noaa, time_idx=0):
-    # 🔒 ЗАЩИТА: это должен быть NOAA-файл
-    if "2m_temperature" not in ds_noaa.data_vars:
-        raise ValueError(
-            f"load_temperature_grid(): wrong dataset, variables = {list(ds_noaa.data_vars)}"
-        )
-
-    time_idx = int(np.clip(time_idx, 0, ds_noaa.sizes["time"] - 1))
-
-    """
-    Возвращает температуру 2m_temperature
-    В УЗЛАХ СЕТКИ (1° × 1°), БЕЗ интерполяции
-    """
-
-    # координаты
-    lat_name, lon_name = guess_lat_lon_names(ds_noaa)
-
-    lats = ds_noaa[lat_name].values
-    lons = ds_noaa[lon_name].values
-
-    # температура в Кельвинах → °C
-    t2m = ds_noaa["2m_temperature"].isel(time=time_idx) - 273.15
-    t2m_vals = t2m.values.astype(float)
-
-    points = []
-
-    for i, lat in enumerate(lats):
-        for j, lon in enumerate(lons):
-            if not (45 <= lat <= 60 and 0 <= lon <= 50):
-                continue
-            val = t2m_vals[time_idx, i, j]
-            if np.isnan(val):
-                continue
-
-            points.append({
-                "lat": float(lat),
-                "lon": float(lon),
-                "temp": round(float(val), 1)
-            })
-
-    return points
-
-
 def deg_to_arrow(deg):
     arrows = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"]
     return arrows[int((deg + 22.5) // 45) % 8]
@@ -198,178 +134,101 @@ def deg_to_arrow(deg):
 # ----------------------------------------------------------
 #  ГЛАВНАЯ ФУНКЦИЯ —
 # ----------------------------------------------------------
-def load_forecast(TARGET_LAT=54.2724, TARGET_LON=18.5861, model: str = "graphcast"):
+def load_forecast(TARGET_LAT=54.2724, TARGET_LON=18.5861, model: str = "ifs_swan"):
     """
     Основная функция — возвращает JSON прогноз.
-    Здесь полностью используется ТВОЙ код, только обёрнут.
     """
+    # получение текущего времени для расчета скорости работы программы
     start = time.perf_counter()
 
-    # === 1. Берём ПОСЛЕДНИЙ ОБЩИЙ ЦИКЛ ===
-    fname = find_latest_common_pred_file()
-
-    latest_swan = SWAN_DIR / fname
-    noaa_dir = get_noaa_dir(model)
-    latest_noaa = noaa_dir / fname
-
-    use_gfs_wave = (model == "gfs")
-    latest_gfs_wave = find_latest_gfs_wave_file(GFS_WAVE_DIR) if use_gfs_wave else None
-
-    # конец предыдущего интервала
-    end_time = parse_end_time_from_name(latest_swan.name)
+    # === 1. Берём полный путь к ПОСЛЕДнему файл для этой конкретной модели===
+    wiatr, fala = find_latest_common_pred_file(model)
 
     # === 2. Загружаем данные ===
-    with open_dataset_safe(latest_swan) as ds_swan, \
-            open_dataset_safe(latest_noaa, decode_timedelta=False) as ds_noaa:
-
-        # === FIX: приводим SWAN time к datetime64 ===
-        if np.issubdtype(ds_swan["time"].dtype, np.timedelta64):
-            ds_swan = ds_swan.assign_coords(
-                time=end_time + ds_swan["time"]
-            )
-
-        #load_temperature_grid(ds_noaa)
-
-        # === 3. NOAA — исправляем время ===
-        time_raw = ds_noaa["time"].values
-
-        if np.issubdtype(time_raw.dtype, np.timedelta64):
-            hours = time_raw / np.timedelta64(1, "h")
-        else:
-            hours = time_raw.astype(float)
-
-        start_real_time = end_time
-
-        real_times = np.array(
-            [start_real_time + np.timedelta64(int(h), "h") for h in hours],
-            dtype="datetime64[m]"
-        )
-
-        ds_noaa = ds_noaa.assign_coords(time=("time", real_times))
-
-        # === 4. Находим имена координат ===
-        lat_swan, lon_swan = guess_lat_lon_names(ds_swan)
-        lat_noaa, lon_noaa = guess_lat_lon_names(ds_noaa)
-
-        # === 5. Обрезаем SWAN по времени ===
-        ds_swan_sel = ds_swan.sel(time=slice(end_time, None))
-        ds_noaa_sel = ds_noaa
+    with open_dataset_safe(fala) as ds_fala, \
+            open_dataset_safe(wiatr, decode_timedelta=False) as ds_wiatr:
 
         # === 6. Формируем общие временные шаги ===
+
         common_time = np.intersect1d(
-            ds_swan_sel["time"].values,
-            ds_noaa_sel["time"].values
+            ds_fala["time"].values,
+            ds_wiatr["time"].values
         )
-        #print("Общие временные шаги:", common_time)
 
-        ds_swan_sel = ds_swan_sel.sel(time=common_time)
-        ds_noaa_sel = ds_noaa_sel.sel(time=common_time)
+        # обрезаем по общим временным шагам
+        ds_fala = ds_fala.sel(time=common_time)
+        ds_wiatr = ds_wiatr.sel(time=common_time)
 
-        # === 7. Берём точку SWAN — только ближайшая, без интерполяции ===
-
-        # === 🌊 ВОЛНЫ ===
-
-        if use_gfs_wave:
-            # === GFS WAVE ===
-            latest_gfs_wave = find_latest_gfs_wave_file(GFS_WAVE_DIR)
-            with xr.open_dataset(latest_gfs_wave) as ds_wave:
-
-                lat_w, lon_w = guess_lat_lon_names(ds_wave)
-
-                point_wave = ds_wave.sel(
-                    {lat_w: TARGET_LAT, lon_w: TARGET_LON},
-                    method="nearest"
-                )
-
-                hs_values = point_wave["hs"].values.astype(float)
-                has_wave_data = not np.all(np.isnan(hs_values))
-
-        elif model == "ifs":
-            # === IFS WAVE ===
-            latest_gfs_wave = find_latest_gfs_wave_file(IFS_WAVE_DIR)
-
-            with xr.open_dataset(latest_gfs_wave) as ds_wave:
-
-                lat_w, lon_w = guess_lat_lon_names(ds_wave)
-
-                point_wave = ds_wave.sel(
-                    {lat_w: TARGET_LAT, lon_w: TARGET_LON},
-                    method="nearest"
-                )
-
-                hs_values = point_wave["significant_wave_height"].values.astype(float)
-                has_wave_data = not np.all(np.isnan(hs_values))
-
-        else:
-            # === SWAN ===
-            point_swan = ds_swan_sel.sel(
-                {lat_swan: TARGET_LAT, lon_swan: TARGET_LON},
-                method="nearest"
-            )
-
-            hs_values = point_swan["hs"].values.astype(float)
-            has_wave_data = not np.all(np.isnan(hs_values))
-
-        # формируем waves один раз
-        if not has_wave_data:
-            waves = None
-        else:
-            waves = np.round(hs_values.squeeze(), 2).tolist()
-
-        # === NOAA — настоящая билинейная интерполяция ===
-
-        point_noaa = ds_noaa_sel.sel(
-            {lat_noaa: TARGET_LAT, lon_noaa: TARGET_LON},
+        # возьмем только одну точку волны волн
+        point_wave = ds_fala.sel(
+            {"lat": TARGET_LAT, "lon": TARGET_LON},
             method="nearest"
         )
 
-        wind_ds = ds_noaa_sel[
+        hs_values = point_wave["significant_wave_height"].values.astype(float)
+
+        if np.isfinite(hs_values).any():
+            waves = np.round(hs_values.squeeze(), 2).tolist()
+        else:
+            waves = None
+
+        # возьмем только одну точку волны ветра
+        point_wiatr = ds_wiatr.sel(
+            {"lat": TARGET_LAT, "lon": TARGET_LON},
+            method="nearest"
+        )
+
+        wind_ds = ds_wiatr[
             ["10m_u_component_of_wind", "10m_v_component_of_wind", "2m_temperature", "total_precipitation_6hr"]
         ]
 
         wind_point = wind_ds.interp(
-            {lat_noaa: TARGET_LAT, lon_noaa: TARGET_LON},
+            {"lat": TARGET_LAT, "lon": TARGET_LON},
             method="linear"
         )
 
         # === 8. Переменные ===
 
-        t2m = point_noaa["2m_temperature"]
-        msl = point_noaa["mean_sea_level_pressure"]
+        t2m = point_wiatr["2m_temperature"]
+        msl = point_wiatr["mean_sea_level_pressure"]
         tp6 = wind_point["total_precipitation_6hr"]
         #sh = point_noaa["specific_humidity"]
         u10 = wind_point["10m_u_component_of_wind"]
         v10 = wind_point["10m_v_component_of_wind"]
         # --- ПОРЫВЫ ВЕТРА ---
-        if "fg10" in point_noaa.data_vars:
-            fg10 = point_noaa["fg10"]
+        if "fg10" in point_wiatr.data_vars:
+            fg10 = point_wiatr["fg10"]
         else:
             fg10 = None
 
         # --- ОБЛАЧНОСТЬ ---
-        if "total_cloud_cover" in point_noaa.data_vars:
-            tcc = point_noaa["total_cloud_cover"]
+        if "total_cloud_cover" in point_wiatr.data_vars:
+            tcc = point_wiatr["total_cloud_cover"]
         else:
             tcc = None
 
+
+
         # === 9. Приводим всё в удобный формат ===
-        times = point_noaa["time"].values
+        times = point_wiatr["time"].values
         time_str = [np.datetime_as_string(t, unit="m") for t in times]
 
-        temp_C = np.round((t2m.values.astype(float).squeeze() - 273.15), 1).tolist()
-        pressure_hpa = np.round((msl.values.astype(float).squeeze() / 100.0), 1).tolist()
-        scale = 10 if model == "gfs" else 1
+        t2m_vals = t2m.values.astype(float).squeeze()
+        msl_vals = msl.values.astype(float).squeeze()
+        temp_C = np.round((t2m_vals - 273.15), 1).tolist()
+        pressure_hpa = np.round((msl_vals / 100.0), 1).tolist()
+        scale = 5 if model == "gfs" else 1
         rain_mm = np.round((tp6.values.astype(float).squeeze() * 1000.0 * scale), 2).tolist() # zmenilem z 1000 na 3600
 
-        if model == "graphcast":
-            rain_mm = [x if x >= 0.2 else 0 for x in rain_mm]
-        elif model == "gfs":
-            rain_mm = [x if x >= 0.01 else 0 for x in rain_mm]
+
+
 
         # ветер
+        u10_vals = u10.values.astype(float).squeeze()
+        v10_vals = v10.values.astype(float).squeeze()
         wind_ms = np.sqrt(
-            (u10.values.astype(float).squeeze()) ** 2 +
-            (v10.values.astype(float).squeeze()) ** 2
+            (u10_vals) ** 2 +
+            (v10_vals) ** 2
         )
 
         wind_kt = np.round(wind_ms * 1.943844, 1).tolist()
@@ -380,8 +239,8 @@ def load_forecast(TARGET_LAT=54.2724, TARGET_LON=18.5861, model: str = "graphcas
         wind_dir = (
                            np.degrees(
                                np.arctan2(
-                                   -u10.values.astype(float).squeeze(),
-                                   -v10.values.astype(float).squeeze()
+                                   -u10_vals,
+                                   -v10_vals
                                )
                            ) + 360
                    ) % 360
@@ -418,7 +277,7 @@ def load_forecast(TARGET_LAT=54.2724, TARGET_LON=18.5861, model: str = "graphcas
         print(f"Время выполнения load_forecast: {end - start:.3f} сек")
 
         # === 10. Возвращаем JSON ===
-        if waves == None:
+        if waves is None:
             return {
                 "time": time_str,
                 #"waves": waves,
@@ -449,8 +308,8 @@ def load_forecast(TARGET_LAT=54.2724, TARGET_LON=18.5861, model: str = "graphcas
 
 def load_forecast_all_models(TARGET_LAT=54.3, TARGET_LON=18.6):
 
-    print("Loading GraphCast...")
-    gc = load_forecast(TARGET_LAT, TARGET_LON, model="graphcast")
+    #print("Loading IFS_SWAN...")
+    #gc = load_forecast(TARGET_LAT, TARGET_LON, model="ifs_swan")
 
     print("Loading GFS...")
     gfs = load_forecast(TARGET_LAT, TARGET_LON, model="gfs")
@@ -459,35 +318,35 @@ def load_forecast_all_models(TARGET_LAT=54.3, TARGET_LON=18.6):
     ifs = load_forecast(TARGET_LAT, TARGET_LON, model="ifs")
 
     return {
-        "time": gc.get("time"),
+        "time": ifs.get("time"),
 
         # TEMPERATURE
-        "temp_gc": gc.get("temp"),
+       # "temp_gc": gc.get("temp"),
         "temp_gfs": gfs.get("temp"),
         "temp_ifs": ifs.get("temp"),
 
         # WIND
-        "wind_gc": gc.get("wind_ms"),
+        #"wind_gc": gc.get("wind_ms"),
         "wind_gfs": gfs.get("wind_ms"),
         "wind_ifs": ifs.get("wind_ms"),
 
         # GUST
-        "gust_gc": gc.get("wind_porywy_ms"),
+        #"gust_gc": gc.get("wind_porywy_ms"),
         "gust_gfs": gfs.get("wind_porywy_ms"),
         "gust_ifs": ifs.get("wind_porywy_ms"),
 
         # WAVES
-        "wave_gc": gc.get("waves"),
+        #"wave_gc": gc.get("waves"),
         "wave_gfs": gfs.get("waves"),
         "wave_ifs": ifs.get("waves"),
 
         # CLOUDS
-        "cloud_gc": gc.get("total_cloud_cover"),
+        #"cloud_gc": gc.get("total_cloud_cover"),
         "cloud_gfs": gfs.get("total_cloud_cover"),
         "cloud_ifs": ifs.get("total_cloud_cover"),
 
         # PRESSURE
-        "pressure_gc": gc.get("pressure"),
+        #"pressure_gc": gc.get("pressure"),
         "pressure_gfs": gfs.get("pressure"),
         "pressure_ifs": ifs.get("pressure"),
     }
