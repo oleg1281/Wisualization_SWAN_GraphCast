@@ -132,6 +132,67 @@ def get_forecast(
     return forecast
 
 
+@app.get("/api/wind_grid")
+def get_wind_grid(
+    south: float,
+    west: float,
+    north: float,
+    east: float,
+    model: str = "ifs_swan",
+    time_step: int = 0,
+    run_offset: int = 0,
+    spacing: float = 1.0,
+):
+    spacing = max(0.5, min(3.0, spacing))
+    south, north = sorted((max(-90.0, south), min(90.0, north)))
+    west, east = sorted((west, east))
+
+    lat_values = np.arange(
+        np.floor(south / spacing) * spacing,
+        north + spacing,
+        spacing,
+    )
+    lon_values = np.arange(
+        np.floor(west / spacing) * spacing,
+        east + spacing,
+        spacing,
+    )
+
+    wiatr, _ = find_latest_common_pred_file(
+        model,
+        run_offset=max(0, run_offset),
+    )
+
+    with xr.open_dataset(wiatr, decode_timedelta=False, engine="netcdf4") as ds:
+        time_index = max(0, min(time_step, ds.sizes["time"] - 1))
+        coords = {
+            "lat": xr.DataArray(lat_values, dims="grid_lat"),
+            "lon": xr.DataArray(np.mod(lon_values, 360.0), dims="grid_lon"),
+        }
+        u_grid = ds["10m_u_component_of_wind"].isel(time=time_index).squeeze(drop=True).interp(coords)
+        v_grid = ds["10m_v_component_of_wind"].isel(time=time_index).squeeze(drop=True).interp(coords)
+
+        u_values = u_grid.values.astype(float)
+        v_values = v_grid.values.astype(float)
+
+    points = []
+    for lat_index, lat in enumerate(lat_values):
+        for lon_index, lon in enumerate(lon_values):
+            u = u_values[lat_index, lon_index]
+            v = v_values[lat_index, lon_index]
+            if not np.isfinite(u) or not np.isfinite(v):
+                continue
+            points.append({
+                "lat": round(float(lat), 3),
+                "lon": round(float(lon), 3),
+                "u": round(float(u), 2),
+                "v": round(float(v), 2),
+                "speed": round(float(np.hypot(u, v)), 2),
+            })
+
+    return {"points": points}
+
+
 @app.get("/api/forecast_pdf")
 def forecast_pdf(lat: float = 54.2724, lon: float = 18.5861):
 
