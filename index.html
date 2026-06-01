@@ -49,6 +49,11 @@
       max-height: 280px;
     }
 
+    /* На десктопе поднимаем панель выше, если есть строка волн */
+    #forecast-panel.has-waves {
+      max-height: 320px;
+    }
+
     /* === Когда закрыто — увезти вниз на 60% === */
   #forecast-panel.closed {
     transform: translateY(calc(100% - 70px));
@@ -128,6 +133,7 @@
     }
 
     .waves { color: #4de8ff; }
+    .swell { color: #8fc7ff; }
     .wind { color: #ffd633; }
     .temp { color: #ff9b7d; }
     .rain { color: #00baff; }
@@ -157,6 +163,52 @@
       transform: scale(1.03);
       box-shadow: 0 0 18px #00e5ff99;
       border-color: #00e5ffaa;
+    }
+
+    #polygon-picker {
+      position: absolute;
+      top: 80px;
+      left: 10px;
+      z-index: 10001;
+      background: rgba(0, 30, 45, 0.8);
+      border: 1px solid rgba(0, 229, 255, 0.45);
+      border-radius: 10px;
+      color: #dffaff;
+      padding: 8px 10px;
+      width: min(260px, calc(100vw - 20px));
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.22);
+    }
+
+    @media (max-width: 900px) {
+      #polygon-picker {
+        top: 126px;
+        left: 10px;
+        width: min(240px, calc(100vw - 20px));
+      }
+    }
+
+    #polygon-picker label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 6px;
+      color: #b8f4ff;
+    }
+
+    #polygon-select {
+      width: 100%;
+      background: rgba(0, 12, 20, 0.88);
+      color: #dffaff;
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    #polygon-select:focus {
+      outline: none;
+      border-color: #00e5ff;
+      box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.22);
     }
 
     /* === Кнопка Play === */
@@ -271,21 +323,25 @@
       -webkit-backdrop-filter: blur(6px);
       border: 1px solid rgba(255,255,255,0.2);
 
-      width: 400px;
-      min-height: 320px;
+      width: min(760px, calc(100vw - 20px));
+      min-height: 190px;
 
       display: none;
       z-index: 999999;
 
       flex-direction: column;
-      gap: 6px;
+      gap: 2px;
     }
 
     .chart-top {
-      height: 130px;
+      height: 170px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
     }
 
     .chart-bottom {
+      display: block;
       height: 160px;
     }
 
@@ -582,15 +638,105 @@
   </style>
 
   <style>
+    #run-switcher {
+      position: fixed;
+      top: 10px;
+      left: 62px;
+      display: flex;
+      gap: 6px;
+      z-index: 1000001;
+    }
+
+    .run-btn {
+      min-width: 0;
+      border: 1px solid rgba(180, 235, 255, 0.45);
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(10, 60, 90, 0.82), rgba(8, 30, 46, 0.82));
+      color: #e8f9ff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      padding: 6px 9px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow:
+        0 6px 14px rgba(0, 0, 0, 0.28),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+
+    .run-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(160, 240, 255, 0.9);
+      box-shadow:
+        0 9px 18px rgba(0, 0, 0, 0.35),
+        0 0 16px rgba(0, 210, 255, 0.22);
+    }
+
+    .run-btn.active {
+      background: linear-gradient(135deg, rgba(0, 140, 200, 0.92), rgba(0, 90, 140, 0.92));
+      border-color: rgba(120, 240, 255, 0.95);
+      box-shadow:
+        0 10px 22px rgba(0, 115, 155, 0.45),
+        0 0 20px rgba(0, 220, 255, 0.35);
+    }
+
+    .run-btn.nav {
+      width: 34px;
+      height: 32px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .run-btn.reset {
+      padding-left: 10px;
+      padding-right: 10px;
+      white-space: nowrap;
+    }
+  </style>
+
+  <style>
+    #soft-toast {
+      position: fixed;
+      left: 0;
+      top: 0;
+      transform: translateY(10px);
+      background: rgba(8, 24, 36, 0.78);
+      color: #e9f9ff;
+      border: 1px solid rgba(120, 220, 255, 0.55);
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 100002;
+    }
+
+    #soft-toast.show {
+      opacity: 1;
+    }
+  </style>
+
+  <style>
     #ui-overlay {
       position: fixed;
       right: 10px;
-      bottom: 260px;              /* ← отступ от панели прогноза */
+      bottom: 300px;              /* ← чуть выше: между графиком и таблицей */
       display: flex;
       flex-direction: column;
       gap: 10px;                  /* расстояние между кнопками */
       pointer-events: auto;
-      z-index: 100000;
+      z-index: 1000001;
     }
 
     /* разрешаем клики по кнопкам */
@@ -664,39 +810,44 @@
     @media (max-width: 900px) {
       #wind-chart-box {
         width: min(360px, calc(100vw - 20px));
-        min-height: 250px;
+        min-height: auto;
       }
 
       .chart-top {
-        height: 105px;
-      }
-
-      .chart-bottom {
-        height: 120px;
+        height: 160px;
       }
     }
 
     @media (max-width: 768px) {
+      .chart-bottom {
+        display: none !important;
+      }
+
+      #run-switcher {
+        display: none;
+      }
+
       #ui-overlay {
         top: calc(env(safe-area-inset-top, 0px) + 10px);
-        left: 10px;
+        left: 58px;
         right: 10px;
         bottom: auto;
 
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 8px;
       }
 
       #ui-overlay button {
         width: 100%;
         font-size: 11px;
-        padding: 8px 10px;
+        padding: 6px 8px;
+        min-height: 34px;
         border-radius: 12px;
       }
 
       #wind-chart-box {
-        top: calc(env(safe-area-inset-top, 0px) + 118px);
+        top: calc(env(safe-area-inset-top, 0px) + 84px);
         left: 10px;
         right: 10px;
         width: auto;
@@ -710,6 +861,7 @@
         font-size: 10px;
         flex-wrap: wrap;
       }
+
 
       #time-controls {
         left: 10px;
@@ -735,7 +887,7 @@
 
       #forecast-panel {
         padding: 8px 8px calc(10px + env(safe-area-inset-bottom, 0px));
-        max-height: 38vh;
+        max-height: calc(100vh - 110px);
       }
 
       #forecast-title {
@@ -767,30 +919,27 @@
 
     @media (max-width: 520px) {
       #ui-overlay {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 6px;
       }
 
       #ui-overlay button {
         font-size: 10px;
-        padding: 8px 8px;
+        padding: 5px 7px;
+        min-height: 30px;
       }
 
       #wind-chart-box {
-        top: calc(env(safe-area-inset-top, 0px) + 108px);
-        min-height: 190px;
+        top: calc(env(safe-area-inset-top, 0px) + 78px);
+        min-height: auto;
       }
 
       .chart-top {
-        height: 78px;
-      }
-
-      .chart-bottom {
-        height: 86px;
+        height: 150px;
       }
 
       #forecast-panel {
-        max-height: 34vh;
+        max-height: calc(100vh - 100px);
       }
 
       #forecast-panel.closed {
@@ -814,11 +963,101 @@
         height: 38px;
       }
 
-      /* второстепенные строки можно скрыть на совсем маленьком экране */
-      #forecast-table .rain,
-      #forecast-table .cloud,
-      #forecast-table .pressure {
+    }
+
+    @media (max-width: 950px) and (orientation: landscape) {
+      #run-switcher {
         display: none;
+      }
+
+      #ui-overlay {
+        top: calc(env(safe-area-inset-top, 0px) + 8px);
+        left: 10px;
+        right: 10px;
+        bottom: auto;
+        display: flex;
+        flex-wrap: nowrap;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        width: auto;
+        gap: 6px;
+        padding: 4px;
+        border-radius: 12px;
+        background: rgba(4, 18, 28, 0.34);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+
+      #ui-overlay button {
+        width: auto;
+        flex: 1 1 0;
+        min-height: 28px;
+        font-size: 9px;
+        padding: 4px 5px;
+        border-radius: 9px;
+        white-space: nowrap;
+      }
+
+      #wind-chart-box {
+        top: calc(env(safe-area-inset-top, 0px) + 212px);
+        left: 10px;
+        right: 10px;
+        width: auto;
+        min-height: auto;
+        z-index: 1000000;
+      }
+
+      #forecast-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: calc(100vh - 96px);
+        border-top-right-radius: 12px;
+        border-top-left-radius: 12px;
+      }
+
+      /* В ландшафте скрываем таблицу сильнее вниз */
+      #forecast-panel.closed {
+        transform: translateY(calc(100% - 42px));
+      }
+
+      #wind-chart-box {
+        display: none !important;
+      }
+
+      #forecast-title {
+        font-size: 12px;
+      }
+
+      #forecast-panel table {
+        font-size: 9px;
+      }
+
+      #forecast-panel td {
+        padding: 2px 3px;
+      }
+
+      .day-header {
+        font-size: 9px;
+        padding: 2px 3px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      #forecast-panel table {
+        font-size: 9px;
+      }
+
+      #forecast-panel td {
+        padding: 2px 3px;
+      }
+
+      .day-header {
+        font-size: 9px;
+        padding: 2px 3px;
       }
     }
   </style>
@@ -829,6 +1068,12 @@
 </head>
 
 <body>
+  <div id="run-switcher">
+    <button id="run-prev-btn" class="run-btn nav" title="Poprzedni prognoz" aria-label="Poprzedni prognoz">←</button>
+    <button id="run-current-btn" class="run-btn reset active" title="Aktualny prognoz" aria-label="Aktualny prognoz">⟳ Aktualny</button>
+    <button id="run-next-btn" class="run-btn nav" title="Następny prognoz" aria-label="Następny prognoz">→</button>
+  </div>
+
   <div id="ui-overlay">
     <button id="wind-toggle" class="toggle-btn">Wiatr: m/s</button>
     <button id="model-toggle" class="toggle-btn">🧠 Model MEWO</button>
@@ -841,9 +1086,17 @@
 
   <div id="map"></div>
 
+  <div id="polygon-picker">
+    <label for="polygon-select">Wybór projektu</label>
+    <select id="polygon-select">
+      <option value=""></option>
+    </select>
+  </div>
+
   <div id="loading-overlay">
     <div class="loader"></div>
   </div>
+  <div id="soft-toast"></div>
 
 
   <div id="time-controls">
@@ -875,7 +1128,38 @@
 
   <script>
     let marker = null;
-    let currentModel = "ifs";
+    let currentModel = "ifs_swan";
+    let toastTimer = null;
+    let runOffset = 0;
+    let landscapeBottomMode = "table"; // table | chart
+
+    function showToast(message, durationMs = 2200, anchorEl = null) {
+      const toast = document.getElementById("soft-toast");
+      if (!toast) return;
+      toast.textContent = message;
+
+      if (anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        const top = Math.max(8, rect.top - 42);
+        const left = Math.max(8, rect.left + rect.width / 2);
+        toast.style.top = `${top}px`;
+        toast.style.left = `${left}px`;
+        toast.style.bottom = "auto";
+        toast.style.transform = "translateX(-50%) translateY(10px)";
+      } else {
+        toast.style.top = "50%";
+        toast.style.left = "50%";
+        toast.style.bottom = "auto";
+        toast.style.transform = "translate(-50%, -50%)";
+      }
+
+      toast.classList.add("show");
+
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, durationMs);
+    }
 
     // 👇 ВСТАВИТЬ СЮДА
     function getAttributionText() {
@@ -887,6 +1171,9 @@
       }
       if (currentModel === "ifs_swan") {
         return "Based on ECMWF data © ECMWF + SWAN model";
+      }
+      if (currentModel === "ifs_wam") {
+        return "Based on ECMWF data + WAM Cycle 4.7";
       }
       return "";
     }
@@ -908,22 +1195,101 @@
     // =======================
     // 🔷 ПОЛИГОНЫ (GeoJSON)
     // =======================
+    let highlightedPolygonLayer = null;
+
     fetch("/static/polygons.geojson")
       .then(r => r.json())
       .then(geojson => {
         L.geoJSON(geojson, {
           style: {
-            color: "rgba(0, 255, 255, 0.9)",   // контур
+            color: "rgba(0, 255, 255, 0.55)",
             weight: 2,
-            fillColor: "rgba(0, 180, 220, 0.65)", // плотный морской цвет
-            fillOpacity: 0.28                  // ← ключевая строка
+            fillColor: "rgba(0, 180, 220, 0.22)",
+            fillOpacity: 0.14
           }
         }).addTo(map);
       });
 
+    function clearHighlightedPolygon() {
+      if (highlightedPolygonLayer) {
+        map.removeLayer(highlightedPolygonLayer);
+        highlightedPolygonLayer = null;
+      }
+    }
+
+    function loadHighlightedPolygon(filename) {
+      clearHighlightedPolygon();
+      if (!filename) return;
+
+      fetch(`/static/${encodeURIComponent(filename)}`)
+        .then(r => {
+          if (!r.ok) {
+            throw new Error("Не удалось загрузить выбранный полигон");
+          }
+          return r.json();
+        })
+        .then(geojson => {
+          highlightedPolygonLayer = L.geoJSON(geojson, {
+            style: {
+              color: "#ffe600",
+              weight: 3,
+              fillColor: "#ffe600",
+              fillOpacity: 0.22
+            }
+          }).addTo(map);
+          if (filename.toLowerCase() === "polygons.geojson") {
+            map.setView([54.9, 17.9], 7);
+            return;
+          }
+
+          const bounds = highlightedPolygonLayer.getBounds();
+          if (bounds.isValid()) {
+            const rightUiPadding = Math.round(map.getSize().x * 0.32);
+            map.fitBounds(bounds, {
+              paddingTopLeft: [40, 40],
+              paddingBottomRight: [rightUiPadding, 40],
+              maxZoom: 9
+            });
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          showToast("Ошибка загрузки части полигона");
+        });
+    }
+
+    function setupPolygonSelector() {
+      const select = document.getElementById("polygon-select");
+      if (!select) return;
+
+      fetch("/api/polygon_parts")
+        .then(r => r.json())
+        .then(data => {
+          const files = Array.isArray(data.parts) ? data.parts : [];
+          files.forEach(name => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name.toLowerCase() === "polygons.geojson"
+              ? "MEWO all projects"
+              : name.replace(".geojson", "");
+            select.appendChild(option);
+          });
+        })
+        .catch(() => {
+          showToast("Не удалось получить список полигонов");
+        });
+
+      select.addEventListener("change", () => {
+        loadHighlightedPolygon(select.value);
+      });
+    }
+
+    setupPolygonSelector();
+
     map.on("click", function (e) {
       const lat = e.latlng.lat;
       const lon = e.latlng.lng;
+      landscapeBottomMode = "table";
       
       // Показываем загрузку
       showLoader();
@@ -1067,30 +1433,137 @@
       }, 200);
     }
 
+    function isPhoneLandscape() {
+      return window.matchMedia("(max-width: 950px) and (orientation: landscape)").matches;
+    }
+
+    function isMobilePortrait() {
+      return window.matchMedia("(max-width: 768px) and (orientation: portrait)").matches;
+    }
+
+    function renderBottomPanel(data) {
+      const panel = document.getElementById("forecast-panel");
+      if (!panel) return;
+
+      const hasWaves = Array.isArray(data?.waves) && data.waves.length > 0;
+      const hasSwell = Array.isArray(data?.swell) && data.swell.length > 0;
+      panel.classList.toggle("has-waves", (hasWaves || hasSwell) && !isPhoneLandscape());
+
+      if (!isPhoneLandscape() || landscapeBottomMode === "table") {
+        panel.innerHTML = buildForecastPanel();
+        if (isPhoneLandscape()) {
+          panel.classList.remove("closed");
+          const handle = panel.querySelector("#panel-handle");
+          if (handle) {
+            panel.insertAdjacentHTML(
+              "beforeend",
+              `<button id="panel-view-toggle" class="toggle-btn" style="position:absolute;top:6px;left:calc(50% + 24px);z-index:3;padding:4px 8px;font-size:10px;min-height:26px;">📈 Graf</button>`
+            );
+            const btn = document.getElementById("panel-view-toggle");
+            if (btn) {
+              btn.onclick = (e) => {
+                e.stopPropagation();
+                landscapeBottomMode = "chart";
+                renderBottomPanel(data);
+              };
+            }
+          }
+        }
+        return;
+      }
+
+      panel.innerHTML = `
+        <div id="panel-handle">
+          <svg width="22" height="12" viewBox="0 0 22 12">
+            <path d="M2 2 L11 10 L20 2"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.85)"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <button id="panel-view-toggle" class="toggle-btn" style="position:absolute;top:6px;left:calc(50% + 24px);z-index:3;padding:4px 8px;font-size:10px;min-height:26px;">📋 Tabela</button>
+        <div id="bottom-chart-legend" style="display:flex;justify-content:center;gap:14px;margin-bottom:4px;font-size:11px;color:white;">
+          <span class="legend-item wind">Wiatr (m/s)</span>
+          <span class="legend-item waves">Fale (m)</span>
+        </div>
+        <div id="bottom-chart-scroll" style="height:170px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;">
+          <canvas id="bottomWindWaveChart"></canvas>
+        </div>
+        <div style="
+          margin-top:6px;
+          font-size:11px;
+          color:#9fdfff;
+          opacity:0.85;
+          text-align:center;
+        ">
+          ${getAttributionText()}
+        </div>
+      `;
+
+      updatewindWaveChart(
+        useKt ? data.wind_kt : data.wind_ms,
+        data.waves,
+        data.time,
+        {
+          canvasId: "bottomWindWaveChart",
+          boxId: null,
+          legendWindSelector: "#bottom-chart-legend .legend-item.wind",
+          scrollContainerId: "bottom-chart-scroll",
+          minPxPerPoint: 20,
+          showAllPoints: true
+        }
+      );
+
+      const btn = document.getElementById("panel-view-toggle");
+      if (btn) {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          landscapeBottomMode = "table";
+          renderBottomPanel(data);
+        };
+      }
+
+    }
+
     function sendCoordsToAPI(lat, lon) {
       // Показываем окно графика
-      document.getElementById("wind-chart-box").style.display = "block";
-      return fetch(`/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}`)
-        .then(r => r.json())
+      if (!isPhoneLandscape()) {
+        document.getElementById("wind-chart-box").style.display = "block";
+      }
+      return fetch(`/api/forecast?lat=${lat}&lon=${lon}&model=${currentModel}&run_offset=${runOffset}`)
+        .then(async (r) => {
+          if (!r.ok) {
+            const errText = await r.text();
+            throw new Error(errText || `HTTP ${r.status}`);
+          }
+          return r.json();
+        })
         .then(data => {
           console.log("Ответ FastAPI:", data);
 
           forecast = data;
-          document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
+          renderBottomPanel(data);
           //onTimeChange(0);
           // 🔥 показываем мини-график ветра рядом с маркером
-          updatewindWaveChart(
-            useKt ? data.wind_kt : data.wind_ms,
-            data.waves,
-            data.time
-          );
-          updateTempChart(data.temp, data.time);
+          if (!isPhoneLandscape()) {
+            updatewindWaveChart(
+              useKt ? data.wind_kt : data.wind_ms,
+              data.waves,
+              data.time
+            );
+            updateTempChart(data.temp, data.time);
+          } else {
+            document.getElementById("wind-chart-box").style.display = "none";
+          }
         })
         .catch(err => console.error("Ошибка запроса:", err));
     }
 
     function initStartPoint(lat, lon) {
       showLoader();
+      landscapeBottomMode = "table";
 
       if (marker) map.removeLayer(marker);
 
@@ -1153,6 +1626,7 @@
   const {
     time = [],
     waves = null,
+    swell = null,
     wind_kt = null,
     wind_ms = null,
     wind_arrow = [],
@@ -1242,6 +1716,12 @@
           </tr>
           <tr><td></td>${dateLabels.map(d=>`<td>${d}</td>`).join("")}<td style="min-width:20px;"></td></tr>
           
+          ${swell && swell.length ? `
+          <tr class="swell">
+            <td>Swell (m)</td>
+            ${swell.map(w => `<td class="${waveClass(w)}">${w}</td>`).join("")}
+          </tr>` : ""}
+
           ${waves && waves.length ? `
           <tr class="waves">
             <td>🌊 Fale (m)</td>
@@ -1351,21 +1831,39 @@
     let windWaveChart = null;
     let tempChart = null;
 
-    function updatewindWaveChart(windValues, waveValues, times) {
+    function getPointsForDays(times, daysToShow = 5) {
+      if (!times || times.length < 2) return daysToShow * 4; // fallback для 6-часового шага
+      const first = new Date(times[0]).getTime();
+      const second = new Date(times[1]).getTime();
+      const stepHours = Math.max(1, (second - first) / (1000 * 60 * 60));
+      return Math.ceil((daysToShow * 24) / stepHours);
+    }
+
+    function updatewindWaveChart(windValues, waveValues, times, options = {}) {
 
       if (!windValues || !times) return;
 
-      const box = document.getElementById("wind-chart-box");
-      box.style.display = "flex";
+      const canvasId = options.canvasId || "windWaveChart";
+      const boxId = options.boxId === undefined ? "wind-chart-box" : options.boxId;
+      const legendWindSelector = options.legendWindSelector || "#charts-legend .legend-item.wind";
+      const scrollContainerId = options.scrollContainerId || null;
+      const minPxPerPoint = options.minPxPerPoint || 20;
+      const showAllPoints = options.showAllPoints || false;
 
-      const wind5 = windValues.slice(0, 18);
-      const time5 = times.slice(0, 18);
+      const box = boxId ? document.getElementById(boxId) : null;
+      if (box) box.style.display = "flex";
+
+      const pointsToShow = showAllPoints ? times.length : getPointsForDays(times, 5);
+      const wind5 = windValues.slice(0, pointsToShow);
+      const time5 = times.slice(0, pointsToShow);
 
       const wave5 = waveValues && waveValues.length
-        ? waveValues.slice(0, 18)
+        ? waveValues.slice(0, pointsToShow)
         : null;
 
-      const ctx = document.getElementById("windWaveChart").getContext("2d");
+      const canvasEl = document.getElementById(canvasId);
+      if (!canvasEl) return;
+      const ctx = canvasEl.getContext("2d");
 
       if (windWaveChart) windWaveChart.destroy();
 
@@ -1387,6 +1885,8 @@
           backgroundColor: "rgba(255, 210, 0, 0.25)",
           borderWidth: 2,
           tension: 0.35,
+          pointRadius: isMobilePortrait() ? 0 : 2.5,
+          pointHoverRadius: isMobilePortrait() ? 0 : 4,
           yAxisID: "y1"
         }
       ];
@@ -1399,8 +1899,24 @@
           backgroundColor: "rgba(0, 200, 255, 0.25)",
           borderWidth: 2,
           tension: 0.35,
+          pointRadius: isMobilePortrait() ? 0 : 2.5,
+          pointHoverRadius: isMobilePortrait() ? 0 : 4,
           yAxisID: "y2"
         });
+      }
+
+      // Если нужен длинный график как таблица — делаем холст шире и включаем горизонтальный скролл
+      let chartResponsive = true;
+      const scrollContainer = scrollContainerId ? document.getElementById(scrollContainerId) : canvasEl.parentElement;
+      if (scrollContainer) {
+        const containerWidth = Math.max(320, scrollContainer.clientWidth || 320);
+        const chartWidth = Math.max(containerWidth, labels.length * minPxPerPoint);
+        const chartHeight = Math.max(140, scrollContainer.clientHeight || 170);
+        canvasEl.style.width = `${chartWidth}px`;
+        canvasEl.style.height = `${chartHeight}px`;
+        canvasEl.width = chartWidth;
+        canvasEl.height = chartHeight;
+        chartResponsive = false;
       }
 
       windWaveChart = new Chart(ctx, {
@@ -1413,16 +1929,21 @@
           plugins: {
             legend: { display: false }
           },
-          responsive: true,
+          responsive: chartResponsive,
           maintainAspectRatio: false,
           scales: {
             x: {
               display: true,
               ticks: {
-                display: false,
-                autoSkip: false,     // чтобы линии были на каждый label (как “частые”)
-                maxRotation: 0,
-                minRotation: 0
+                display: true,
+                autoSkip: false,
+                maxRotation: 60,
+                minRotation: 40,
+                color: "#dffaff",
+                font: {
+                  size: isMobilePortrait() ? 11 : 10,
+                  weight: isMobilePortrait() ? "bold" : "500"
+                }
               },
               grid: {
                 display: true,
@@ -1430,6 +1951,7 @@
                 color: "rgba(255,255,255,0.1)",   // ✅ как в температуре
                 lineWidth: 1
               },
+              offset: false,
               border: { display: false }
             },
             y1: {
@@ -1438,13 +1960,17 @@
               max: useKt ? 40 : 20,
               ticks: {
                 stepSize: useKt ? 5 : 2.5,
-                color: "#ffd200"
+                color: "#ffd200",
+                font: {
+                  size: isMobilePortrait() ? 11 : 10,
+                  weight: isMobilePortrait() ? "bold" : "500"
+                }
               },
               title: {
                 display: true,
                 text: useKt ? "Wiatr (kt)" : "Wiatr (m/s)",
                 color: "#ffd200",
-                font: { size: 11, weight: "bold" }
+                font: { size: isMobilePortrait() ? 12 : 11, weight: "bold" }
               },
               grid: {
                 color: "rgba(255,210,0,0.25)"
@@ -1455,7 +1981,11 @@
                 position: "right",
                 min: 0,
                 ticks: {
-                  color: "#00c8ff"
+                  color: "#00c8ff",
+                  font: {
+                    size: isMobilePortrait() ? 11 : 10,
+                    weight: isMobilePortrait() ? "bold" : "500"
+                  }
                 },
                 grid: {
                   drawOnChartArea: false
@@ -1464,7 +1994,7 @@
                   display: true,
                   text: "Fale (m)",
                   color: "#00c8ff",
-                  font: { size: 11, weight: "bold" }
+                  font: { size: isMobilePortrait() ? 12 : 11, weight: "bold" }
                 }
               }
             } : {})
@@ -1472,8 +2002,10 @@
         }
       });
 
-      document.querySelector(".legend-item.wind").textContent =
-        useKt ? "Wiatr (kt)" : "Wiatr (m/s)";
+      const windLegend = document.querySelector(legendWindSelector);
+      if (windLegend) {
+        windLegend.textContent = useKt ? "Wiatr (kt)" : "Wiatr (m/s)";
+      }
     }
 
     // =======================
@@ -1494,8 +2026,9 @@
 
       if (tempChart) tempChart.destroy();
 
-      const temp5 = tempValues.slice(0, 20);
-      const time5 = times.slice(0, 20);
+      const pointsToShow = getPointsForDays(times, 5);
+      const temp5 = tempValues.slice(0, pointsToShow);
+      const time5 = times.slice(0, pointsToShow);
 
       // --- гарантируем минимум 5 делений ---
       const minVal = Math.min(...temp5);
@@ -1561,19 +2094,15 @@
           scales: {
             x: {
               offset: false,
-              bounds: "ticks",
               ticks: {
-                source: "labels",
-                color: "white",
-                maxRotation: 75,
-                minRotation: 45,
-
-                // 🔥 ВОТ ЭТО УВЕЛИЧИВАЕТ ДАТЫ
+                autoSkip: false,
+                color: "#dffaff",
+                maxRotation: 60,
+                minRotation: 40,
                 font: {
-                  size: 11,          // ← было 10
-                  weight: "bold"
+                  size: 10
                 },
-                padding: 8           // ← отступ от графика
+                padding: 4
               },
               grid: {
                 color: "rgba(255,255,255,0.1)"
@@ -1631,8 +2160,18 @@
     let currentBaseIndex = 0;
     let useKt = false;
     const modelBtn = document.getElementById("model-toggle");
-    const models = ["gfs", "ifs"];
+    const runCurrentBtn = document.getElementById("run-current-btn");
+    const runPrevBtn = document.getElementById("run-prev-btn");
+    const runNextBtn = document.getElementById("run-next-btn");
+    const models = ["gfs", "ifs_swan", "ifs", "ifs_wam"];
     let modelIndex = models.indexOf(currentModel);
+
+    function refreshForecastForCurrentPoint() {
+      const lat = marker ? marker.getLatLng().lat : START_LAT;
+      const lon = marker ? marker.getLatLng().lng : START_LON;
+      showLoader();
+      sendCoordsToAPI(lat, lon).finally(() => hideLoader());
+    }
 
     document.getElementById("map-toggle").onclick = () => {
       const btn = document.getElementById("map-toggle");
@@ -1657,9 +2196,13 @@
         modelBtn.classList.remove("active");
         modelBtn.textContent = "🧠 Model ECMWF IFS + SWAN";
       }
+      else if (currentModel === "ifs_wam") {
+        modelBtn.classList.remove("active");
+        modelBtn.textContent = "ECMWF IFS + WAM";
+      }
       else if (currentModel === "ifs") {
         modelBtn.classList.add("active");
-        modelBtn.textContent = "🌍 Model ECMWF IFS";
+        modelBtn.textContent = "ECMWF IFS";
       }
     }
 
@@ -1673,12 +2216,38 @@
       currentModel = models[modelIndex];
 
       updateModelButton();
+      refreshForecastForCurrentPoint();
+    };
 
-      const lat = marker ? marker.getLatLng().lat : START_LAT;
-      const lon = marker ? marker.getLatLng().lng : START_LON;
+    runCurrentBtn.onclick = () => {
+      runOffset = 0;
+      runCurrentBtn.classList.add("active");
+      runPrevBtn.classList.remove("active");
+      runNextBtn.classList.remove("active");
+      refreshForecastForCurrentPoint();
+    };
 
-      showLoader();
-      sendCoordsToAPI(lat, lon).finally(() => hideLoader());
+    runPrevBtn.onclick = () => {
+      runOffset += 1;
+      runPrevBtn.classList.add("active");
+      runCurrentBtn.classList.remove("active");
+      runNextBtn.classList.remove("active");
+      refreshForecastForCurrentPoint().catch(() => {
+        runOffset = Math.max(0, runOffset - 1);
+        showToast("To jest najstarszy prognoz", 2200, runPrevBtn);
+      });
+    };
+
+    runNextBtn.onclick = () => {
+      if (runOffset === 0) {
+        showToast("To jest aktualny prognoz", 2200);
+        return;
+      }
+      runOffset -= 1;
+      runNextBtn.classList.add("active");
+      runCurrentBtn.classList.toggle("active", runOffset === 0);
+      runPrevBtn.classList.remove("active");
+      refreshForecastForCurrentPoint();
     };
 
     document.getElementById("download-pdf").onclick = async () => {
@@ -1844,13 +2413,31 @@
       btn.classList.toggle("active", useKt);
 
       if (!forecast) return;
-      document.getElementById("forecast-panel").innerHTML = buildForecastPanel();
-      updatewindWaveChart(
-        useKt ? forecast.wind_kt : forecast.wind_ms,
-        forecast.waves,
-        forecast.time
-      );
+      renderBottomPanel(forecast);
+      if (!isPhoneLandscape()) {
+        updatewindWaveChart(
+          useKt ? forecast.wind_kt : forecast.wind_ms,
+          forecast.waves,
+          forecast.time
+        );
+      }
     };
+
+    window.addEventListener("resize", () => {
+      const isLandscape = isPhoneLandscape();
+      if (isLandscape) {
+        document.getElementById("wind-chart-box").style.display = "none";
+      } else if (forecast) {
+        document.getElementById("wind-chart-box").style.display = "flex";
+        updatewindWaveChart(
+          useKt ? forecast.wind_kt : forecast.wind_ms,
+          forecast.waves,
+          forecast.time
+        );
+        updateTempChart(forecast.temp, forecast.time);
+      }
+      if (forecast) renderBottomPanel(forecast);
+    });
 
     function waveClass(wave) {
       if (wave > 1.5) return "cell-nogo";

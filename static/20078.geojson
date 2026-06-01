@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "20078",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "area_km2": 5.29186588483, "PROJECT_NO": 20078.0, "NAME": "PIG Zatoka Gdańska", "TYPE": "OTH", "NO": 0, "status": "COMPLETED", "geotechnic": "x", "ORIG_FID": 27, "Shape_Leng": 14759.3426733, "Shape_Area": 5291865.8848299999 }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ 18.896822894653464, 54.431819195755395, 0.0 ], [ 18.798718036171611, 54.414882862584271, 0.0 ], [ 18.8006182132813, 54.42134042147508, 0.0 ], [ 18.807143627995995, 54.421442572870781, 0.0 ], [ 18.806991090878078, 54.431736523986174, 0.0 ], [ 18.896822894653464, 54.431819195755395, 0.0 ] ] ] ] } }
+]
+}

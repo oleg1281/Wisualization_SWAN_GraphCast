@@ -27,6 +27,7 @@ from forecast import (
 from fastapi.responses import HTMLResponse
 from fastapi import Request
 from pathlib import Path
+from fastapi.responses import JSONResponse
 
 from fastapi.staticfiles import StaticFiles
 
@@ -98,23 +99,35 @@ def normalize_lon_0360(lon):
 def index():
     return INDEX_HTML.read_text(encoding="utf-8")
 
+
+@app.get("/api/polygon_parts", response_class=JSONResponse)
+def get_polygon_parts():
+    static_dir = BASE_DIR / "static"
+    parts = sorted(
+        p.name
+        for p in static_dir.glob("*.geojson")
+    )
+    return {"parts": parts}
+
 @app.get("/api/forecast")
 
 def get_forecast(
     lat: float = 54.3,
     lon: float = 18.6,
-    model: str = "ifs_swan"   # ← ВАЖНО
+    model: str = "ifs_swan",   # ← ВАЖНО
+    run_offset: int = 0
 ):
     lat = max(-90.0, min(90.0, lat))
-    lat = round(lat, 1)
+    #lat = round(lat, 1)
 
     lon = normalize_lon_0360(lon)
-    lon = round(lon, 1)
+    #lon = round(lon, 1)
 
     forecast = load_forecast(
         TARGET_LAT=lat,
         TARGET_LON=lon,
-        model=model            # ← ВАЖНО
+        model=model,            # ← ВАЖНО
+        run_offset=max(0, run_offset)
     )
     return forecast
 

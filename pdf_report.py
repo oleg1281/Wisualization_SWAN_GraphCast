@@ -50,7 +50,7 @@ def _parse_time_labels(time_list):
     for t in time_list:
         try:
             dt = datetime.fromisoformat(str(t).replace("Z", ""))
-            labels.append(dt.strftime("%d.%m %H:%M"))
+            labels.append(dt.strftime("%d.%m %Hh"))
         except Exception:
             # fallback: keep something readable
             s = str(t)
@@ -175,7 +175,39 @@ def plot_multi_series_pro(
     ax.tick_params(axis='y', labelsize=6)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(x_labels, rotation=90, ha="center", fontsize=8)
+    ax.set_xticklabels(
+        x_labels,
+        rotation=90,
+        ha="center",
+        fontsize=5.4
+    )
+    ax.tick_params(axis='x', pad=0)
+
+    # Контрольные уровни для быстрой визуальной оценки
+    threshold = None
+    threshold_label = None
+    if "Wysokość fali" in title:
+        threshold = 1.0
+        threshold_label = "Poziom 1.0 m"
+    elif "Wiatr (m/s)" in title:
+        threshold = 10.0
+        threshold_label = "Poziom 10 m/s"
+    elif "Porywy" in title:
+        threshold = 15.0
+        threshold_label = "Poziom 15 m/s"
+    elif "Temperatura" in title:
+        threshold = 0.0
+        threshold_label = "Poziom 0°C"
+
+    if threshold is not None:
+        ax.axhline(
+            y=threshold,
+            color="#d81b60",
+            linestyle=(0, (6, 4)),
+            linewidth=1.2,
+            alpha=0.9,
+            label=threshold_label
+        )
 
     # ---------------- Y AXIS ----------------
     if y_step and all_values:
@@ -211,12 +243,13 @@ def plot_multi_series_pro(
     ax.minorticks_on()
     ax.grid(True, which="major", linestyle="-", linewidth=0.6, alpha=0.25)
     ax.grid(True, which="minor", linestyle="--", linewidth=0.4, alpha=0.18)
-    ax.legend(fontsize=8, frameon=False)
+    ax.legend(fontsize=7, frameon=False)
 
     for spine in ax.spines.values():
         spine.set_alpha(0.35)
 
-    fig.tight_layout()
+    # больше нижнего поля под вертикальные подписи дат
+    fig.tight_layout(rect=(0, 0.13, 1, 1))
 
     buf = BytesIO()
     fig.savefig(buf, format="png")
@@ -258,8 +291,9 @@ def build_forecast_pdf(forecast: dict, lat: float, lon: float) -> bytes:
     W, H = A4
 
     COLORS = {
-        "GFS": "#2aa1ff",        # синий
-        "IFS": "#e5533d",        # красный
+        "GFS": "#2aa1ff",  # синий
+        "IFS": "#111111",  # черный
+        "IFS_SWAN": "#e5533d"  # красный
     }
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -422,6 +456,7 @@ def build_forecast_pdf(forecast: dict, lat: float, lon: float) -> bytes:
             series_list=[
                 ("ECMWF IFS", forecast.get(f"{key}_ifs"), COLORS["IFS"]),
                 ("NOAA GFS",       forecast.get(f"{key}_gfs"), COLORS["GFS"]),
+                ("IFS + SWAN", forecast.get(f"{key}_gc"), COLORS["IFS_SWAN"]),
             ],
             y_label=unit,
             y_step=step,
